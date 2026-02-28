@@ -814,277 +814,330 @@ stateDiagram-v2
 2. Async Execution: Callbacks don't run immediately on resolve.
 3. Chaining: `.then()` returns a NEW Promise.
 
-### Slide 27: Promise - Step 1: Basic Structure
+### Slide 27: Promise - Step 1: Types & Constants
 
-Let's build our Promise step by step. First, let's define the core structure:
+Let's build our Promise step by step, following the solution code. First, let's define the types we'll need:
 
 ```typescript
-type Status = 'pending' | 'fulfilled' | 'rejected'
-type Executor<T> = (resolve: (value: T) => void, reject: (reason: any) => void) => void
+type PromiseStatus = 'pending' | 'fulfilled' | 'rejected'
 
-class MyPromise<T> {
-  private status: Status = 'pending'
-  private value: T | undefined = undefined
-  private reason: any = undefined
+const PENDING: PromiseStatus = 'pending'
+const FULFILLED: PromiseStatus = 'fulfilled'
+const REJECTED: PromiseStatus = 'rejected'
 
-  constructor(executor: Executor<T>) {
-    // We'll fill this in next step
-  }
+type Executor<T> = (
+  resolve: (value: T | PromiseLike<T>) => void,
+  reject: (reason?: any) => void,
+) => void
+
+type OnFulfilled<T, R> = ((value: T) => R | PromiseLike<R>) | undefined | null
+type OnRejected<R> = ((reason: any) => R | PromiseLike<R>) | undefined | null
+
+type Handler<T> = {
+  onFulfilled: (value: T) => any
+  onRejected: (reason: any) => any
+  resolve: (value: any) => void
+  reject: (reason: any) => void
 }
 ```
 
-**Key insight**: A Promise is essentially a state machine with 3 states. Once it transitions from `pending`, it never changes again.
+**Key points**: We define status constants to avoid string typos. The `Handler` interface stores both callbacks AND the next promise's resolve/reject — this is how chaining works.
 
-### Slide 28: Promise - Step 2: Resolve & Reject Functions
+### Slide 28: Promise - Step 2: Class Skeleton
 
-Now let's implement the `resolve` and `reject` functions inside the constructor:
+Now let's set up the class with its private fields:
+
+```typescript
+export class MyPromise<T = any> {
+  #handlers: Handler<T>[] = []
+  #status: PromiseStatus = PENDING
+  #value: T | any
+  #isResolved: boolean = false
+}
+```
+
+### Slide 29: Promise - Step 3: The then() Method
+
+`.then()` returns a NEW Promise — this is the heart of chaining:
+
+```mermaid
+flowchart LR
+    P1["Promise A"] -->|".then()"| P2["Promise B"]
+    P2 -->|".then()"| P3["Promise C"]
+
+    P1 -.-|"A resolves → runs callback → resolves B"| P2
+    P2 -.-|"B resolves → runs callback → resolves C"| P3
+```
+
+
+```typescript
+then<R = T>(onFulfilled?: OnFulfilled<T, R>, onRejected?: OnRejected<R>): MyPromise<R> {
+  const handler: Handler<T> = {
+    onFulfilled: typeof onFulfilled === 'function' ? onFulfilled : (v: T) => v as any,
+    onRejected:
+      typeof onRejected === 'function'
+        ? onRejected
+        : (err: any) => {
+            throw err
+          },
+    resolve: () => {},
+    reject: () => {},
+  }
+
+  const promise = new MyPromise<R>((res, rej) => {
+    handler.resolve = res
+    handler.reject = rej
+  })
+
+  this.#handlers.push(handler)
+
+  if (this.#status !== PENDING) {
+    this.#execute()
+  }
+
+  return promise
+}
+```
+
+**Key details**:
+- Default `onFulfilled` passes the value through (identity function)
+- Default `onRejected` re-throws the error (error propagation)
+- We capture `resolve`/`reject` of the **new** promise into the handler
+- If already settled, execute immediately; otherwise handlers wait in queue
+
+### Slide 30: Promise - Step 4: Handler Execution with Microtasks
+
+When the promise settles, we need to run all queued handlers asynchronously:
+
+```typescript
+#execute = (): void => {
+  const handlers = this.#handlers
+  for (const { onFulfilled, onRejected, resolve, reject } of handlers) {
+    const handler = this.#status === FULFILLED ? onFulfilled : onRejected
+    queueMicrotask(() => {
+      try {
+        const result = handler(this.#value)
+        if (result instanceof MyPromise) {
+          result.then(resolve, reject)
+        } else {
+          resolve(result)
+        }
+      } catch (e) {
+        reject(e)
+      }
+    })
+  }
+  this.#handlers = []
+}
+```
+
+**Why `queueMicrotask`?** Promise callbacks must run asynchronously. Without it:
+```typescript
+const p = new MyPromise((resolve) => resolve(1))
+p.then((v) => console.log(v))
+console.log('sync')
+// Without microtask: 1, sync  ❌
+// With microtask:    sync, 1  ✅
+```
+
+**Why check `instanceof MyPromise`?** If a `.then()` callback returns a Promise, we must wait for it before resolving the next promise in the chain.
+
+### Slide 31: Promise - Step 5: The #settle Method
+
+The core state transition — a unified method for both resolve and reject:
+
+```mermaid
+flowchart TD
+    A["settle(value, status)"] --> B{"Already settled?"}
+    B -->|Yes| C["Do nothing"]
+    B -->|No| D{"Is value another Promise?"}
+    D -->|Yes| E["Wait for it to resolve first"]
+    E --> F
+    D -->|No| F["Store value & update status"]
+    F --> G["Run all queued handlers"]
+```
+
+
+```typescript
+#settle = (v: T | any, status: PromiseStatus = FULFILLED): void => {
+  if (this.#isResolved) return    // Can only settle ONCE
+  this.#isResolved = true
+
+  const update = (v: T | any): void => {
+    this.#value = v
+    this.#status = status
+    this.#execute()               // Trigger queued handlers
+  }
+
+  // If resolving with another MyPromise, wait for it first
+  if (v instanceof MyPromise && status === FULFILLED) {
+    v.then(update)
+  } else {
+    update(v)
+  }
+}
+
+#resolve = (v: T | PromiseLike<T>): void => void this.#settle(v, FULFILLED)
+#reject = (e: any): void => void this.#settle(e, REJECTED)
+```
+
+### Slide 32: Promise - Step 6: Constructor
+
+The constructor receives an executor and runs it immediately:
 
 ```typescript
 constructor(executor: Executor<T>) {
-  const resolve = (value: T) => {
-    // Can only transition ONCE from pending
-    if (this.status !== 'pending') return
-
-    this.status = 'fulfilled'
-    this.value = value
-  }
-
-  const reject = (reason: any) => {
-    if (this.status !== 'pending') return
-
-    this.status = 'rejected'
-    this.reason = reason
-  }
-
-  // Execute immediately, catching any sync errors
+  this.#status = PENDING
+  this.#isResolved = false
   try {
-    executor(resolve, reject)
-  } catch (error) {
-    reject(error)
+    executor(this.#resolve, this.#reject)
+  } catch (e) {
+    this.#reject(e)
   }
 }
 ```
 
-**Note**: The executor runs synchronously. If it throws, we reject the promise.
+**Note**: Since `#resolve` and `#reject` are arrow functions (not methods), they correctly capture `this` — no binding needed. If the executor throws synchronously, we catch it and reject.
 
-### Slide 29: Promise - Step 3: Handler Queue
+### Slide 33: Promise - Step 7: catch() & Static Methods
 
-What if `.then()` is called BEFORE resolve? We need to queue handlers:
+These are simple shortcuts:
 
 ```typescript
-type Handler<T> = {
-  onFulfilled?: (value: T) => any
-  onRejected?: (reason: any) => any
+catch<R = never>(onRejected?: OnRejected<R>): MyPromise<T | R> {
+  return this.then<T | R>(undefined, onRejected)
+}
+
+static resolve<T>(value: T): MyPromise<T> {
+  return new MyPromise<T>((res) => res(value))
+}
+
+static reject<T = never>(value: any): MyPromise<T> {
+  return new MyPromise<T>((_, rej) => rej(value))
+}
+```
+
+### Slide 34: Promise - Complete Implementation
+
+Here's the full working Promise implementation. Let's verify it against the tests:
+
+```typescript
+type PromiseStatus = 'pending' | 'fulfilled' | 'rejected'
+
+const PENDING: PromiseStatus = 'pending'
+const FULFILLED: PromiseStatus = 'fulfilled'
+const REJECTED: PromiseStatus = 'rejected'
+
+type Executor<T> = (
+  resolve: (value: T | PromiseLike<T>) => void,
+  reject: (reason?: any) => void,
+) => void
+
+type OnFulfilled<T, R> = ((value: T) => R | PromiseLike<R>) | undefined | null
+type OnRejected<R> = ((reason: any) => R | PromiseLike<R>) | undefined | null
+
+interface Handler<T> {
+  onFulfilled: (value: T) => any
+  onRejected: (reason: any) => any
   resolve: (value: any) => void
   reject: (reason: any) => void
 }
 
-class MyPromise<T> {
-  private handlers: Handler<T>[] = []
+export class MyPromise<T = any> {
+  #handlers: Handler<T>[] = []
+  #status: PromiseStatus = PENDING
+  #value: T | any
+  #isResolved: boolean = false
 
-  // ... previous code ...
-
-  private executeHandlers() {
-    if (this.status === 'pending') return // Not ready yet
-
-    this.handlers.forEach((handler) => {
-      if (this.status === 'fulfilled') {
-        const result = handler.onFulfilled?.(this.value!)
-        handler.resolve(result)
-      } else {
-        const result = handler.onRejected?.(this.reason)
-        handler.reject(result)
-      }
-    })
-
-    this.handlers = [] // Clear after execution
-  }
-}
-```
-
-### Slide 30: Promise - Step 4: The then() Method
-
-`.then()` must return a NEW Promise to enable chaining:
-
-```typescript
-then<TResult>(
-  onFulfilled?: (value: T) => TResult,
-  onRejected?: (reason: any) => any
-): MyPromise<TResult> {
-
-  return new MyPromise<TResult>((resolve, reject) => {
-    // Add handler to queue
-    this.handlers.push({
-      onFulfilled,
-      onRejected,
-      resolve,
-      reject
-    })
-
-    // Try to run immediately (if already resolved)
-    this.executeHandlers()
-  })
-}
-```
-
-**Key insight**: Each `.then()` creates a new Promise. The chain propagates through the resolve/reject passed to each handler.
-
-### Slide 31: Promise - Step 5: Calling Handlers on Resolve
-
-Update `resolve` and `reject` to trigger handlers:
-
-```typescript
-const resolve = (value: T) => {
-  if (this.status !== 'pending') return
-
-  this.status = 'fulfilled'
-  this.value = value
-  this.executeHandlers() // <-- Trigger queued handlers
-}
-
-const reject = (reason: any) => {
-  if (this.status !== 'pending') return
-
-  this.status = 'rejected'
-  this.reason = reason
-  this.executeHandlers() // <-- Trigger queued handlers
-}
-```
-
-Now handlers run whether `.then()` is called before OR after resolution!
-
-### Slide 32: Promise - Step 6: Microtask Scheduling
-
-**Problem**: Callbacks should run asynchronously (microtask), not immediately.
-
-```typescript
-// Without microtask (WRONG):
-const p = new MyPromise((resolve) => resolve(1))
-p.then((v) => console.log(v))
-console.log('sync')
-// Output: 1, sync  ❌
-
-// With microtask (CORRECT):
-// Output: sync, 1  ✅
-```
-
-**Fix**: Wrap handler execution in `queueMicrotask`:
-
-```typescript
-private executeHandlers() {
-  if (this.status === 'pending') return
-
-  this.handlers.forEach(handler => {
-    queueMicrotask(() => {  // <-- Schedule as microtask
-      if (this.status === 'fulfilled') {
-        const result = handler.onFulfilled?.(this.value!)
-        handler.resolve(result)
-      } else {
-        handler.onRejected?.(this.reason)
-      }
-    })
-  })
-
-  this.handlers = []
-}
-```
-
-### Slide 33: Promise - Step 7: Handling Returned Promises
-
-When `.then()` callback returns a Promise, we must wait for it:
-
-```typescript
-queueMicrotask(() => {
-  try {
-    if (this.status === 'fulfilled') {
-      const result = handler.onFulfilled ? handler.onFulfilled(this.value!) : this.value
-
-      // If result is a Promise, wait for it
-      if (result instanceof MyPromise) {
-        result.then(handler.resolve, handler.reject)
-      } else {
-        handler.resolve(result)
-      }
+  #settle = (v: T | any, status: PromiseStatus = FULFILLED): void => {
+    if (this.#isResolved) return
+    this.#isResolved = true
+    const update = (v: T | any): void => {
+      this.#value = v
+      this.#status = status
+      this.#execute()
     }
-  } catch (error) {
-    handler.reject(error)
-  }
-})
-```
-
-**Key insight**: This enables `promise.then(() => fetch('/api'))` to chain properly.
-
-### Slide 34: Promise - Step 8: catch() and finally()
-
-These are just shortcuts for `.then()`:
-
-```typescript
-catch<TResult>(
-  onRejected: (reason: any) => TResult
-): MyPromise<T | TResult> {
-  return this.then(undefined, onRejected)
-}
-
-finally(onFinally: () => void): MyPromise<T> {
-  return this.then(
-    (value) => {
-      onFinally()
-      return value
-    },
-    (reason) => {
-      onFinally()
-      throw reason
+    if (v instanceof MyPromise && status === FULFILLED) {
+      v.then(update)
+    } else {
+      update(v)
     }
-  )
-}
-```
+  }
 
-### Slide 35: Promise - Step 9: Static Methods
+  #resolve = (v: T | PromiseLike<T>): void => void this.#settle(v, FULFILLED)
+  #reject = (e: any): void => void this.#settle(e, REJECTED)
 
-```typescript
-static resolve<T>(value: T): MyPromise<T> {
-  return new MyPromise(resolve => resolve(value))
-}
-
-static reject(reason: any): MyPromise<never> {
-  return new MyPromise((_, reject) => reject(reason))
-}
-```
-
-### Slide 36: Promise - Complete Implementation
-
-Here's the full working Promise implementation:
-
-```typescript
-class MyPromise<T> {
-  private status: Status = 'pending'
-  private value: T | undefined
-  private reason: any
-  private handlers: Handler<T>[] = []
+  #execute = (): void => {
+    const handlers = this.#handlers
+    for (const { onFulfilled, onRejected, resolve, reject } of handlers) {
+      const handler = this.#status === FULFILLED ? onFulfilled : onRejected
+      queueMicrotask(() => {
+        try {
+          const result = handler(this.#value)
+          if (result instanceof MyPromise) {
+            result.then(resolve, reject)
+          } else {
+            resolve(result)
+          }
+        } catch (e) {
+          reject(e)
+        }
+      })
+    }
+    this.#handlers = []
+  }
 
   constructor(executor: Executor<T>) {
-    const resolve = (value: T) => {
-      if (this.status !== 'pending') return
-      this.status = 'fulfilled'
-      this.value = value
-      this.executeHandlers()
-    }
-    const reject = (reason: any) => {
-      if (this.status !== 'pending') return
-      this.status = 'rejected'
-      this.reason = reason
-      this.executeHandlers()
-    }
+    this.#status = PENDING
+    this.#isResolved = false
     try {
-      executor(resolve, reject)
+      executor(this.#resolve, this.#reject)
     } catch (e) {
-      reject(e)
+      this.#reject(e)
     }
   }
 
-  // ... then, catch, finally, static methods ...
+  then<R = T>(onFulfilled?: OnFulfilled<T, R>, onRejected?: OnRejected<R>): MyPromise<R> {
+    const handler: Handler<T> = {
+      onFulfilled: typeof onFulfilled === 'function' ? onFulfilled : (v: T) => v as any,
+      onRejected:
+        typeof onRejected === 'function'
+          ? onRejected
+          : (err: any) => {
+              throw err
+            },
+      resolve: () => {},
+      reject: () => {},
+    }
+
+    const promise = new MyPromise<R>((res, rej) => {
+      handler.resolve = res
+      handler.reject = rej
+    })
+
+    this.#handlers.push(handler)
+
+    if (this.#status !== PENDING) {
+      this.#execute()
+    }
+
+    return promise
+  }
+
+  catch<R = never>(onRejected?: OnRejected<R>): MyPromise<T | R> {
+    return this.then<T | R>(undefined, onRejected)
+  }
+
+  static resolve<T>(value: T): MyPromise<T> {
+    return new MyPromise<T>((res) => res(value))
+  }
+
+  static reject<T = never>(value: any): MyPromise<T> {
+    return new MyPromise<T>((_, rej) => rej(value))
+  }
 }
 ```
+
 
 ### Slide 37: Tree Select
 
@@ -1129,7 +1182,6 @@ graph TD
 ```typescript
 // paths: defines tree structure
 const paths = ['a/b/c', 'a/b/d', 'a/e']
-
 // clicks: sequence of node clicks
 const clicks = ['b'] // Selects b and all its children (c, d)
 ```
@@ -1144,6 +1196,19 @@ Initial:        Click "b":      Click only "c":
 │  └─[ ]d       │  └─[v]d       │  └─[ ]d
 └─[ ]e          └─[ ]e          └─[ ]e
 ```
+
+**Output Example**:
+
+```typescript
+// Output string:
+// [o]a
+// .[v]b
+// ..[v]c
+// ..[v]d
+// .[ ]e
+```
+
+Dots represent nesting depth, brackets show status: `[v]` = selected, `[ ]` = not selected, `[o]` = partial (some children selected).
 
 ### Slide 38: Solving Tree Select
 
@@ -1160,7 +1225,7 @@ a key principle that we need to apply to solve this problem. Let's apply our str
 ```
 Click on "b":
                     ┌──────────────────┐
-     2. Bubble UP   │   a (recalc)     │
+  3. Bubble UP      │   a (recalc)     │
          ▲          └────────┬─────────┘
          │                   │
          │          ┌────────▼─────────┐
@@ -1168,7 +1233,7 @@ Click on "b":
          │          └────────┬─────────┘
          │                   │
          ▼          ┌────────▼─────────┐
-  Propagate DOWN    │   c, d (set)     │
+ 2. Propagate DOWN  │   c, d (set)     │
                     └──────────────────┘
 ```
 
@@ -1183,25 +1248,98 @@ Click on "b":
 
 **2. Step-by-Step Implementation Plan**:
 
-1. **Define `TreeNode` class** with:
-   - `name`, `parent`, `children[]`, `status` ('v' | ' ' | 'o')
-   - `addChild(node)` - links parent ↔ child
-   - `updateStatus()` - recalculates status from children
+1. **Define `TreeNode` class** with `name`, `parent`, `children[]`, `status`:
 
-2. **Build the tree** with `createTree(paths)`:
-   - Create root node and a `Map<name, TreeNode>` for quick lookup
-   - For each path, split by `/` and create/link nodes
+```typescript
+type SelectionStatus = 'v' | ' ' | 'o'
+const SELECTED: SelectionStatus = 'v'
+const NOT_SELECTED: SelectionStatus = ' '
+const PARTIAL: SelectionStatus = 'o'
 
-3. **Create generator functions**:
-   - `bubble(node)` - yields parents up to root (for UP propagation)
-   - `propagate(node)` - yields all descendants (for DOWN propagation)
+class TreeNode {
+  children: TreeNode[] = []
+  status: SelectionStatus = NOT_SELECTED
 
-4. **Handle each click**:
-   - Toggle clicked node's status (selected ↔ not selected)
-   - `propagate(node)` - set all descendants to same status
-   - `bubble(node)` - recalculate each ancestor's status
+  constructor(public name: string, public parent: TreeNode | null) {}
 
-5. **Render** - convert tree to string with indentation
+  addChild(node: TreeNode): void {
+    node.parent = this
+    this.children.push(node)
+  }
+
+  updateStatus(): void {
+    const selectedCount = this.children.reduce(
+      (acc, node) => acc + (node.status === SELECTED ? 1 : 0), 0
+    )
+    const hasPartialChild = this.children.some((c) => c.status === PARTIAL)
+
+    if (selectedCount === this.children.length && !hasPartialChild) {
+      this.status = SELECTED
+    } else if (selectedCount === 0 && !hasPartialChild) {
+      this.status = NOT_SELECTED
+    } else {
+      this.status = PARTIAL
+    }
+  }
+}
+```
+
+2. **Build the tree** — create root + `Map<name, TreeNode>` for quick lookup:
+
+```typescript
+function createTree(paths: string[]): [TreeNode, Map<string, TreeNode>] {
+  const root = new TreeNode('', null)
+  const store = new Map<string, TreeNode>()
+
+  for (const path of paths) {
+    let parent: TreeNode = root
+    const tokens = path.split('/')
+
+    for (const token of tokens) {
+      let node = store.get(token)
+      if (!node) {
+        node = new TreeNode(token, parent)
+        parent.addChild(node)
+        store.set(token, node)
+      }
+      parent = node
+    }
+  }
+
+  return [root, store]
+}
+```
+
+3. **Create generator functions** — `bubble` goes UP, `propagate` goes DOWN:
+
+```typescript
+function* bubble(target: TreeNode): Generator<TreeNode> {
+  if (target.parent != null) {
+    yield target.parent
+    yield* bubble(target.parent)
+  }
+}
+
+function* propagate(target: TreeNode | null): Generator<TreeNode> {
+  if (target == null) return
+  for (const ch of target.children) {
+    yield ch
+    yield* propagate(ch)
+  }
+}
+```
+
+4. **Handle each click** — toggle, propagate down, bubble up (shown below in Key Implementation).
+
+5. **Render** — convert tree to string with dots for depth:
+
+```typescript
+toString(level: number = -1): string {
+  const dots = Math.max(0, level)
+  const root = level === -1 ? '' : `${'.'.repeat(dots)}[${this.status}]${this.name}\n`
+  return root.concat(this.children.map((n) => n.toString(level + 1)).join(''))
+}
+```
 
 **3. Key Implementation**:
 
@@ -1298,113 +1436,157 @@ flowchart LR
 6. **`afterRender()`** - lifecycle hook for post-render logic (e.g., focus input)
 7. **`destroy()`** - remove event listeners, remove element from DOM
 
-### Slide 43: AbstractComponent - Code Structure
+### Slide 43: Step 1 - Define Props (TComponentConfig)
+
+First, let's define the configuration type. The key insight is that `TComponentConfig` is an **intersection type** — it takes whatever custom props your component needs (`T`) and merges them with the base config fields every component requires:
 
 ```typescript
-abstract class AbstractComponent<T> {
+type TComponentConfig<T extends object> = T & {
+  root: HTMLElement       // Where to mount the component
+  className?: string[]    // CSS classes to apply
+  listeners?: string[]    // Event types to auto-bind (e.g., ['click', 'mouseover'])
+  tag?: keyof HTMLElementTagNameMap  // Container element tag (default: 'div')
+}
+```
+
+We also define sensible **defaults** so subclasses don't have to specify everything:
+
+```typescript
+const DEFAULT_CONFIG: Partial<TComponentConfig<any>> = {
+  className: [],
+  listeners: [],
+  tag: 'div',
+}
+```
+
+So when you create an Accordion, its config type becomes `TAccordionProps & { root, className, listeners, tag }` — your custom props and the base props all in one object!
+
+---
+
+### Slide 44: Step 2 - Class Skeleton & Constructor
+
+Now let's define the abstract class itself. Every component needs three things: its `container` DOM element, the merged `config`, and an `events` array to track listeners for cleanup:
+
+```typescript
+export abstract class AbstractComponent<T extends object> {
   container: HTMLElement | null
   config: TComponentConfig<T>
+  events: Array<{ type: string; callback: EventListenerOrEventListenerObject }>
 
   constructor(config: TComponentConfig<T>) {
-    this.config = config
+    this.config = { ...DEFAULT_CONFIG, ...config }
     this.container = null
-  }
-
-  init() {
-    this.container = document.createElement(this.config.tag)
-    // Add classes, bind listeners from config
-  }
-
-  toHTML(): string {
-    return ``
-  } // Override in subclass
-  afterRender() {} // Optional hook
-
-  render() {
-    if (this.container) this.destroy()
-    this.init()
-    this.container.innerHTML = this.toHTML()
-    this.config.root.appendChild(this.container)
-    this.afterRender()
-  }
-
-  destroy() {
-    // Remove listeners, remove from DOM
+    this.events = []
   }
 }
 ```
 
-### Slide 44: AbstractComponent - Usage Example
+Notice how the constructor **spreads defaults first**, then the incoming config. This means you can override any default simply by passing it in.
 
-```typescript
-class Accordion extends AbstractComponent<TAccordionConfig> {
-  activeIndex = 0
+---
 
-  constructor(config: TAccordionConfig) {
-    super({ ...config, listeners: ['click'] })
-  }
+### Slide 45: Step 3 - init() — Create Element & Bind Listeners
 
-  onClick(e: MouseEvent) {
-    const header = (e.target as HTMLElement).closest('.header')
-    if (header) {
-      this.activeIndex = Number(header.dataset.index)
-      this.render() // Re-render on state change
-    }
-  }
-
-  toHTML() {
-    return this.config.items
-      .map(
-        (item, i) => `
-      <div class="item ${i === this.activeIndex ? 'active' : ''}">
-        <div class="header" data-index="${i}">${item.title}</div>
-        <div class="content">${item.content}</div>
-      </div>
-    `,
-      )
-      .join('')
-  }
-}
-```
-
-### Slide 45: How Listeners Work
-
-The `listeners` config uses a **naming convention** to auto-bind event handlers:
+The `init()` method does two things: creates the container element, and auto-binds event listeners using a **naming convention**:
 
 ```typescript
 // Config: { listeners: ['click', 'mouseover'] }
-
-// In init(), we convert event names to handler names:
+// Naming convention:
 'click'     → 'onClick'      → this.onClick
 'mouseover' → 'onMouseover'  → this.onMouseover
 ```
 
-**The magic inside `init()`**:
+Subclasses just define `onClick(e)` or `onMouseover(e)` methods and list the event type in `listeners`. Here's the full `init()`:
 
 ```typescript
+const toEventName = (type: string): string => {
+  return `on${type[0].toUpperCase()}${type.slice(1)}`
+}
+
 init() {
   this.container = document.createElement(this.config.tag)
 
-  for (const type of this.config.listeners) {
-    // Convert 'click' → 'onClick'
-    const handlerName = `on${type[0].toUpperCase()}${type.slice(1)}`
-
-    // Get the handler method from 'this'
-    const callback = this[handlerName].bind(this)
-
-    // Attach to container (event delegation!)
-    this.container.addEventListener(type, callback)
+  // Apply CSS classes
+  for (const className of this.config.className) {
+    this.container.classList.add(className)
   }
+
+  // Auto-bind listeners
+  this.events = (this.config.listeners || []).map((type) => {
+    const event = toEventName(type)            // 'click' → 'onClick'
+    let callback = this[event]                  // Find handler on subclass
+    if (!callback) {
+      throw Error(`handler ${event} for ${type} is not implemented`)
+    }
+    callback = callback.bind(this)              // Bind to component instance
+    this.container!.addEventListener(type, callback)
+    return { type, callback }                   // Store for cleanup
+  })
 }
 ```
 
-**Why this pattern?**
+**Why this pattern?** Declarative config (just list event types), auto-binding (no manual `.bind(this)`), and easy cleanup (stored references for `removeEventListener`).
 
-- Declarative config - just list event types
-- Auto-binding - no manual `.bind(this)` everywhere
-- Easy cleanup - stored references for `removeEventListener`
+---
 
-### Slide 46: Component 1 - Accordion
+### Slide 46: Step 4 - Lifecycle: render(), toHTML(), afterRender(), destroy()
+
+Finally, the lifecycle methods that tie everything together:
+
+```typescript
+// Override in subclass — returns the component's HTML template
+toHTML(): string {
+  return ``
+}
+
+// Optional hook — runs after component is in the DOM
+afterRender() {}
+
+// The main method — orchestrates the full render cycle
+render() {
+  if (this.container) this.destroy()       // Clean up previous render
+  this.init()                               // Create element + bind listeners
+  this.container!.innerHTML = this.toHTML()  // Set HTML content
+  this.config.root.appendChild(this.container!) // Attach to DOM
+  this.afterRender()                        // Post-render hook
+}
+
+// Cleanup — remove listeners and element from DOM
+destroy() {
+  this.events.forEach(({ type, callback }) => {
+    this.container!.removeEventListener(type, callback)
+  })
+  this.events = []
+  this.container!.remove()
+}
+```
+
+The lifecycle flow: **`render()` → `init()` → `toHTML()` → `innerHTML` → `afterRender()`**. State changes? Just call `this.render()` again — it destroys the old version first!
+
+### Slide 47: AbstractComponent - Usage Example
+
+```typescript
+type TButtonProps = { label: string }
+
+class Button extends AbstractComponent<TButtonProps> {
+  constructor(config: TComponentConfig<TButtonProps>) {
+    super({ ...config, listeners: ['click'] })
+  }
+
+  onClick() {
+    console.log('clicked!')
+  }
+
+  toHTML() {
+    return `<button>${this.config.label}</button>`
+  }
+}
+
+// Usage:
+new Button({ root: document.body, label: 'Submit' }).render()
+```
+
+### Slide 48: Component 1 - Accordion
 
 Alright, let's start with a simple one - the Accordion! You've definitely seen these before - a list of expandable/collapsible sections. Click on a header, content expands. Click again, it collapses. Super common in FAQs, settings panels, and navigation menus.
 
@@ -1419,7 +1601,20 @@ So let's think through this:
 
 ---
 
-### Slide 47: Accordion - The Native HTML Approach
+### Slide 49: Accordion - Step 1: Input Data Sample
+
+To understand what we're building, let's look at the input data. We need an array of objects representing the sections.
+
+```typescript
+const accordionData = [
+  { id: '1', title: 'What is HTML?', content: 'HTML stands for HyperText Markup Language.' },
+  { id: '2', title: 'What is CSS?', content: 'CSS stands for Cascading Style Sheets.' }
+]
+```
+
+---
+
+### Slide 49: Accordion - The Native HTML Approach
 
 So what's the magic? It's the `<details>` and `<summary>` elements. Check this out:
 
@@ -1440,7 +1635,7 @@ No event listeners, no state management, no JavaScript at all. The browser just.
 
 ---
 
-### Slide 48: Accordion - Building the Component
+### Slide 50: Accordion - Building the Component
 
 So our implementation is embarrassingly simple. Here's the step-by-step:
 
@@ -1466,7 +1661,7 @@ export class Accordion extends AbstractComponent<TAccordionProps> {
 
 ---
 
-### Slide 49: Accordion - The toHTML Method
+### Slide 51: Accordion - The toHTML Method
 
 **Step 3**: Implement `toHTML()` - just map items to `<details>` elements
 
@@ -1487,7 +1682,7 @@ And that's the entire component! No `afterRender()`, no event handlers, nothing 
 
 ---
 
-### Slide 50: Accordion - CSS Magic (Shadow DOM)
+### Slide 52: Accordion - CSS Magic (Shadow DOM)
 
 Now here's where it gets interesting. The `<details>` element has shadow DOM parts we can style!
 
@@ -1521,7 +1716,7 @@ Smooth expand/collapse animations without any JavaScript! This `::details-conten
 
 ---
 
-### Slide 51: Component 2 - Star Rating
+### Slide 53: Component 2 - Star Rating
 
 Next up - Star Rating! You see these everywhere - Amazon reviews, app stores, feedback forms. The user hovers over stars to preview their rating, clicks to select it.
 
@@ -1536,7 +1731,22 @@ Let's think through this one:
 
 ---
 
-### Slide 52: Star Rating - Controlled vs Uncontrolled
+### Slide 54: Star Rating - Step 1: Input Data Sample
+
+The input for a Star Rating component is straightforward. We need the current value and a callback for when it changes.
+
+```typescript
+const starRatingProps = {
+  max: 5,
+  value: 3,
+  disabled: false,
+  onChange: (newValue: number) => console.log('New rating:', newValue)
+}
+```
+
+---
+
+### Slide 54: Star Rating - Controlled vs Uncontrolled
 
 Before we code, let's understand this pattern:
 
@@ -1556,7 +1766,7 @@ The key question is: who owns the state? In controlled mode, the parent does. In
 
 ---
 
-### Slide 53: Star Rating - Setting Up
+### Slide 55: Star Rating - Setting Up
 
 **Step 1**: Define our types
 
@@ -1586,7 +1796,7 @@ export class StarRating extends AbstractComponent<TStarRatingProps> {
 
 ---
 
-### Slide 54: Star Rating - The Click Handler
+### Slide 56: Star Rating - The Click Handler
 
 **Step 3**: Implement event delegation
 
@@ -1610,9 +1820,36 @@ onClick(event: MouseEvent): void {
 
 ---
 
-### Slide 55: Star Rating - Rendering the Stars
+### Slide 57: Star Rating - Rendering the Stars
 
-**Step 4**: Generate the star buttons with proper accessibility
+**Step 4**: Generate the star buttons.
+
+```typescript
+toHTML(): string {
+  const stars = Array.from({ length: 5 }, (_, index) => {
+    const starValue = index + 1
+    return `
+      <button
+        data-star-value="${starValue}"
+        data-active="${this.value >= starValue}"
+        ${this.config.readOnly ? 'disabled' : ''}
+      >⭐️</button>
+    `
+  }).join('')
+
+  return `<div>${stars}</div>`
+}
+```
+
+Wait, what about accessibility? Don't worry, we're going to add all the ARIA roles and labels in the next step to keep our code clean!
+
+---
+
+### Slide 58: Star Rating - Accessibility (Step 5)
+
+Now for the most important part: making it accessible. We need to add `role="radiogroup"` to the container and `role="radio"` to each star button.
+
+**Part A**: Update `toHTML()` with ARIA roles and labels
 
 ```typescript
 toHTML(): string {
@@ -1634,11 +1871,7 @@ toHTML(): string {
 }
 ```
 
----
-
-### Slide 56: Star Rating - A11y in afterRender
-
-**Step 5**: Set the radiogroup role on the container
+**Part B**: Set the radiogroup role in `afterRender()`
 
 ```typescript
 afterRender(): void {
@@ -1647,7 +1880,7 @@ afterRender(): void {
 }
 ```
 
-Now screen readers will announce: "Star Rating, radiogroup, 3 of 5 Stars selected"
+Now screen readers will announce: "Star Rating, radiogroup, 3 of 5 Stars selected". Correct accessibility is what separates a senior candidate from a junior one!
 
 The whole component is maybe 50 lines of code, but we've covered:
 
@@ -1657,7 +1890,7 @@ The whole component is maybe 50 lines of code, but we've covered:
 
 ---
 
-### Slide 57: Component 3 - Tabs
+### Slide 59: Component 3 - Tabs
 
 Tabs are another classic! Think of browser tabs, settings pages with different sections, or product pages with Description/Reviews/Specifications.
 
@@ -1672,7 +1905,20 @@ Let's break it down:
 
 ---
 
-### Slide 58: Tabs - Setting Up the Class
+### Slide 60: Tabs - Step 1: Input Data Sample
+
+The Tabs component receives an array of objects, each containing the tab name and its corresponding HTML content.
+
+```typescript
+const tabsData = [
+  { name: 'Description', content: '<p>Product details here.</p>' },
+  { name: 'Reviews', content: '<p>5 stars! Great product.</p>' }
+]
+```
+
+---
+
+### Slide 60: Tabs - Setting Up the Class
 
 **Step 1**: Define types and set up the class
 
@@ -1698,7 +1944,7 @@ Notice the `#` private fields - these are truly private in JavaScript!
 
 ---
 
-### Slide 59: Tabs - Rendering the Tab Buttons
+### Slide 61: Tabs - Rendering the Tab Buttons
 
 **Step 2**: Generate the tab navigation
 
@@ -1727,7 +1973,7 @@ toHTML(): string {
 
 ---
 
-### Slide 60: Tabs - The Activate Tab Logic
+### Slide 62: Tabs - The Activate Tab Logic
 
 **Step 3**: Implement the tab switching
 
@@ -1750,7 +1996,7 @@ This is **partial DOM update** - we update only what changed, not the whole comp
 
 ---
 
-### Slide 61: Tabs - Click Handler and afterRender
+### Slide 63: Tabs - Click Handler and afterRender
 
 **Step 4**: Handle clicks and initialize
 
@@ -1774,7 +2020,7 @@ afterRender(): void {
 
 ---
 
-### Slide 62: Component 4 - Dialog
+### Slide 64: Component 4 - Dialog
 
 Dialogs (also called Modals) are those popup windows that block the rest of the page until you take an action. "Are you sure you want to delete this?" - that's a dialog.
 
@@ -1789,7 +2035,21 @@ Let's think about what we need:
 
 ---
 
-### Slide 63: Dialog - The Native <dialog> Element
+### Slide 65: Dialog - Step 1: Input Data Sample
+
+A dialog component typically receives its content and callbacks for user actions.
+
+```typescript
+const dialogProps = {
+  content: '<p>Are you sure you want to delete this item?</p>',
+  onConfirm: () => console.log('Confirmed!'),
+  onCancel: () => console.log('Cancelled!')
+}
+```
+
+---
+
+### Slide 65: Dialog - The Native <dialog> Element
 
 Before we even write code, let's appreciate what `<dialog>` gives us for free:
 
@@ -1815,7 +2075,7 @@ Before we even write code, let's appreciate what `<dialog>` gives us for free:
 
 ---
 
-### Slide 64: Dialog - Setting Up the Class
+### Slide 66: Dialog - Setting Up the Class
 
 **Step 1**: Define types and create the class
 
@@ -1832,7 +2092,7 @@ export class Dialog extends AbstractComponent<TDialogProps> {
   constructor(config: TComponentConfig<TDialogProps>) {
     super({
       ...config,
-      listeners: ['click'],
+      listeners: ['click', 'close'],
     })
   }
 }
@@ -1840,14 +2100,14 @@ export class Dialog extends AbstractComponent<TDialogProps> {
 
 ---
 
-### Slide 65: Dialog - The toHTML Method
+### Slide 67: Dialog - The toHTML Method
 
 **Step 2**: Render the dialog with action buttons
 
 ```typescript
 toHTML(): string {
   return `
-    <dialog class="${css.container}">
+    <dialog class="${cx(styles.padding24, styles.bNone, styles.br8, css.container)}">
       <section>${this.config.content}</section>
       <footer>
         <button data-action="confirm" autofocus>Confirm</button>
@@ -1862,7 +2122,7 @@ Notice the `data-action` attributes - we'll use those for event delegation. And 
 
 ---
 
-### Slide 66: Dialog - Click Handler and Lifecycle
+### Slide 68: Dialog - Click Handler and Lifecycle
 
 **Step 3**: Handle button clicks
 
@@ -1880,12 +2140,11 @@ onClick(event: MouseEvent): void {
 }
 ```
 
-**Step 4**: Wire up the dialog reference and native close event
+**Step 4**: Handle the native `close` event (fires on Escape key!) and wire up the dialog reference
 
 ```typescript
-afterRender(): void {
-  this.#dialogElement = this.container!.querySelector('dialog')
-  this.#dialogElement?.addEventListener('close', () => this.config.onCancel())
+onClose(): void {
+  this.config.onCancel()
 }
 
 open(): void { this.#dialogElement?.showModal() }
@@ -1894,7 +2153,7 @@ close(): void { this.#dialogElement?.close() }
 
 ---
 
-### Slide 67: Dialog - CSS Magic with ::backdrop
+### Slide 69: Dialog - CSS Magic with ::backdrop
 
 Now for the fun CSS part! The `<dialog>` element has a `::backdrop` pseudo-element we can style:
 
@@ -1915,7 +2174,7 @@ This is another Shadow DOM technique - `::backdrop` is a pseudo-element that exi
 
 ---
 
-### Slide 68: Component 5 - Tooltip
+### Slide 70: Component 5 - Tooltip
 
 Tooltips are those little info bubbles that pop up when you hover over or focus on an element. Think of the "?" icons that explain a feature, or the little labels that appear when you hover over an icon button.
 
@@ -1930,7 +2189,21 @@ Let's think it through:
 
 ---
 
-### Slide 69: Tooltip - The Event Challenge
+### Slide 71: Tooltip - Step 1: Input Data Sample
+
+The Tooltip component takes simple text content and a preferred position relative to the trigger element.
+
+```typescript
+const tooltipProps = {
+  content: 'Prints the current document', // The text to show
+  position: 'top', // Wanted position: top, bottom, left, right 
+  // We'll also need the trigger element that the user hovers over!
+}
+```
+
+---
+
+### Slide 71: Tooltip - The Event Challenge
 
 One tricky thing with tooltips: we need to handle BOTH mouse and keyboard users.
 
@@ -1943,7 +2216,7 @@ Because **`focusin/focusout` bubble**, but `focus/blur` don't! If you use `focus
 
 ---
 
-### Slide 70: Tooltip - Setting Up
+### Slide 72: Tooltip - Setting Up
 
 **Step 1**: Define types and set up listeners
 
@@ -1952,6 +2225,7 @@ type TTooltipProps = {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'auto'
   children: HTMLElement
   content: string
+  boundary?: HTMLElement
 }
 
 export class Tooltip extends AbstractComponent<TTooltipProps> {
@@ -1970,7 +2244,7 @@ That's a lot of listeners! But each one has a simple job.
 
 ---
 
-### Slide 71: Tooltip - The Event Handlers
+### Slide 73: Tooltip - The Event Handlers
 
 **Step 2**: Wire up show/hide for each event
 
@@ -1992,7 +2266,7 @@ Notice Escape key dismisses the tooltip - that's important for accessibility!
 
 ---
 
-### Slide 72: Tooltip - Auto-Positioning Diagram
+### Slide 74: Tooltip - Auto-Positioning Diagram
 
 The fun part: auto-positioning! Where does the tooltip fit?
 
@@ -2016,151 +2290,287 @@ The fun part: auto-positioning! Where does the tooltip fit?
 
 ---
 
-### Slide 73: Tooltip - Auto-Positioning Code
+### Slide 75: Tooltip - Auto-Positioning Code
 
 **Step 3**: Calculate best position based on available space
 
 ```typescript
-function getAutoPosition(tooltip: HTMLElement, container: HTMLElement) {
-  const [tooltipRect, containerRect] = [
-    tooltip.getBoundingClientRect(),
-    container.getBoundingClientRect(),
+type TCandidate = { position: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number }
+
+function getAutoPosition(
+  tooltip: HTMLElement,
+  container: HTMLElement,
+  boundaryRect: { left: number; top: number; right: number; bottom: number },
+) {
+  const t = tooltip.getBoundingClientRect()
+  const c = container.getBoundingClientRect()
+
+  const fits = (x: number, y: number) =>
+    x >= boundaryRect.left &&
+    y >= boundaryRect.top &&
+    Math.ceil(x + t.width) <= boundaryRect.right &&
+    Math.ceil(y + t.height) <= boundaryRect.bottom
+
+  const candidates: TCandidate[] = [
+    { position: 'top', x: c.left + c.width / 2 - t.width / 2, y: c.top - t.height - 8 },
+    { position: 'right', x: c.right + 8, y: c.top + c.height / 2 - t.height / 2 },
+    { position: 'bottom', x: c.left + c.width / 2 - t.width / 2, y: c.bottom + 8 },
+    { position: 'left', x: c.left - t.width - 8, y: c.top + c.height / 2 - t.height / 2 },
   ]
 
-  // Check each direction in priority order
-  const topY = containerRect.top - tooltipRect.height
-  if (topY >= 0) return 'top' // Fits above!
-
-  const rightX = containerRect.right + tooltipRect.width
-  if (rightX <= window.innerWidth) return 'right' // Fits right!
-
-  const leftX = containerRect.left - tooltipRect.width
-  if (leftX >= 0) return 'left' // Fits left!
-
-  return 'bottom' // Fallback
+  return candidates.find(({ x, y }) => fits(x, y))?.position ?? 'top'
 }
 ```
 
-Priority: top → right → left → bottom
+Priority: top → right → bottom → left
+
+> [!TIP]
+> **Pro Tip**: Always use `white-space: nowrap` in CSS and `Math.ceil()` in JS when calculating fits. This prevents the browser from wrapping text during measurement, which can cause erratic "jittering" near the edges!
 
 ---
 
-### Slide 74: Component 6 - Table
+### Slide 76: Component 6 - Table
 
 Now we're getting into something more substantial - the Data Table! Every admin dashboard, analytics page, or data-heavy app needs one.
 
 We need: rows of data with columns, **sorting** by clicking headers, **pagination** to handle large datasets, and a **search filter**. This one has a lot of moving parts, but we'll break it down step by step.
 
-Let's think through the design:
+**Requirements**:
 
-- **What do we need?** Display tabular data, sort by columns, paginate, and filter/search
-- **Data shape?** `columns[]` with sort state, `data[]` rows, `currentPage`, `totalPages`
-- **The pattern?** **Headless/Controlled** - parent manages ALL the state, table just renders
-- **Accessibility?** Semantic `<table>`, `<thead>`, `<tbody>`, `<th>`, `<td>` - the browser does a lot for us
+1. **Columns**: Accept a configuration array for columns, defining header names, ids, and custom renderers for cell content.
+2. **Pagination**: Display specific number of rows per page. Provide "Next" and "Previous" buttons and display current page info (e.g., "1 / 5").
+3. **Sorting**: Allow clicking on headers to sort the table by that column (Ascending -> Descending -> None). Visual indicators (↑/↓) should show sort direction.
+4. **Filtering**: Provide a search input to filter rows based on content.
 
----
+**Accessibility**: Use semantic `<table>`, `<thead>`, `<tbody>`, `<th>`, `<td>` elements. Pagination buttons should have proper disabled states.
 
-### Slide 75: Table - The Headless Pattern
-
-Before we code, let's talk about the pattern: **Headless/Controlled**. The parent manages ALL the state - the table just renders what it's told.
+**API Shape**: The component accepts `columns`, a `datasource` interface for async data fetching, and optional `search` / `comparator` functions.
 
 ```tsx
 <Table
   columns={columns}
-  data={currentPageData} // Parent already paginated this!
-  currentPage={page}
-  totalPages={10}
-  onSort={handleSort} // Parent handles sorting
-  onPageChange={handlePage} // Parent handles pagination
-  onSearch={handleSearch} // Parent handles filtering
+  datasource={datasource}
+  comparator={customSortAlgo}
+  search={customSearchAlgo}
 />
 ```
 
-Why? Because the parent might be fetching data from an API, or applying complex filters. The Table doesn't need to know any of that.
-
 ---
 
-### Slide 76: Table - Setting Up
+### Slide 77: Table - Step 1: Input Data Sample
 
-**Step 1**: Define our types - notice the generic `<T>` for row data
+The core of the table is defining its columns and how to render the data fields.
 
 ```typescript
-type TColumn<T> = {
-  id: keyof T
-  name: string
-  sort?: 'asc' | 'desc' | 'none'
-  render?: (row: T) => string // Custom cell renderer
-}
+const columns = [
+  { id: 'name', name: 'Product Name', sort: 'asc', renderer: (item) => item.name },
+  { id: 'price', name: 'Price', sort: 'none', renderer: (item) => `$${item.price.toFixed(2)}` }
+]
 
-type TTableProps<T> = {
-  columns: TColumn<T>[]
-  data: T[]
-  currentPage: number
-  totalPages: number
-  onSort: (columnId: keyof T, direction: string) => void
-  onPrev: () => void
-  onNext: () => void
-  onSearch: (query: string) => void
-}
+// The data shape expected by the rows
+const data = [
+  { id: 1, name: 'Laptop', price: 999.00 },
+  { id: 2, name: 'Mouse', price: 25.50 }
+]
 ```
 
 ---
 
-### Slide 77: Table - The Click Handler
+### Slide 77: Table - Event Delegation
+/>
+```
 
-**Step 2**: Handle clicks on headers and pagination buttons
+---
+
+### Slide 77: Table - The Datasource Concept
+
+Before we code, let's talk about the key design decision here: the **datasource** interface. Data-source is a contract that defines how to fetch data for the table. The data can be static, async or come from any other source. For table itself it doesn't matter. Table just needs to call a methods of the data source
+It provides a great flexibility for the component and developers, since the data-source can be implemented in any way. For example, we can use it to fetch data from API, from local storage, from database, from file, from any other source.
 
 ```typescript
-onClick(event: MouseEvent): void {
-  const target = event.target as HTMLElement
+interface TTableDataSource<T> {
+  pageSize: number                                    // How many rows per page
+  pages: number                                       // Total number of pages
+  next: (page: number, pageSize: number) => Promise<T[]>  // Fetch data for a page
+}
+```
 
-  // Click on a column header?
-  const header = target.closest('th')
-  if (header) {
-    const columnId = header.dataset.columnId
-    const column = this.config.columns.find(c => c.id === columnId)
-    // Cycle: none → asc → desc → none
-    const newDir = column.sort === 'desc' ? 'none'
-                 : column.sort === 'asc' ? 'desc' : 'asc'
-    this.config.onSort(columnId, newDir)
-    return
+**Benefits:**
+
+1. **Encapsulation** — The Table owns its pagination state, sort state, and search query. The parent just provides the data contract.
+2. **Lazy fetching** — We only call `next()` when the user navigates to a page we haven't loaded yet. Previously fetched pages are cached in local state.
+3. **Separation of concerns** — The parent decides *where* data comes from (API, mock, WebSocket), the Table decides *when* and *how* to display it.
+4. **Testability** — Swap the datasource for a mock in tests without changing any component logic.
+5. **Universal** — Because `next()` returns a `Promise`, the datasource works with *any* data source: REST API, GraphQL, WebSocket, local mock data, or even synchronous arrays wrapped in `Promise.resolve()`. The Table component doesn't care — it just awaits the result.
+
+This is the same pattern used by libraries like AG Grid and TanStack Table — a data adapter that decouples the view from the data source.
+
+---
+
+### Slide 78: Table - Types & State Setup
+
+**Step 1**: Define our types and set up state. The `datasource` interface makes the component self-contained - the parent doesn't need to manage pagination or fetching.
+
+```tsx
+export interface TTableDataSource<T> {
+  pageSize: number,
+  pages: number,
+  next: (page: number, pageSize: number) => Promise<T[]>
+}
+export type TTableColumn<T> = {
+  id: string
+  name: string
+  renderer: (item: T) => React.ReactNode
+  sort?: 'asc' | 'desc' | 'none'
+}
+
+type TTableProps<T extends { id: string }> = {
+  columns: TTableColumn<T>[]
+  datasource: TTableDataSource<T>
+  search?: (query: string, data: T[]) => T[],
+  comparator?: (columnId: keyof T, direction: 'asc' | 'desc') => (a: T, b: T) => number
+}
+```
+
+**State**: We track `data` (accumulated rows), `currentPage`, `query` (search text), and active `sort` column/direction.
+
+```tsx
+const [_query, setQuery] = useState('')
+const query = useDeferredValue(_query);  // Defer search for smoother typing
+const [data, setData] = useState<T[]>([])
+const [currentPage, setCurrentPage] = useState(0);
+const [sort, setSort] = useState<{ columnId: keyof T, direction: 'asc' | 'desc' | 'none' } | null>(null)
+```
+
+---
+
+### Slide 78: Table - The Data Pipeline
+
+**Step 2**: The functional reduction pattern for deriving the final view slice.
+
+Instead of creating messy intersecting `useEffect` blocks, we build a single `useMemo` pipeline: `filter → sort → slice`.
+
+```tsx
+const slice = useMemo(() => {
+  const filterFn = (d: T[]) => {
+    if (!query) return d
+    return search ? search(query, d) : d.filter((item) => item.id.includes(query))
   }
 
-  // Prev/Next buttons?
-  if (target.closest('[data-action="prev"]')) this.config.onPrev()
-  if (target.closest('[data-action="next"]')) this.config.onNext()
-}
+  const sortFn = (d: T[]) => {
+    const sortedColumn = columns.find((c) => c.id === sort?.columnId)
+    if (!sortedColumn || !sort || !comparator || sort.direction === 'none') return d
+    return [...d].sort(comparator(sortedColumn.id as keyof T, sort.direction))
+  }
+
+  const sliceFn = (d: T[]) => {
+    const start = currentPage * datasource.pageSize;
+    const end = (currentPage + 1) * datasource.pageSize;
+    return d.slice(start, end)
+  }
+
+  return [filterFn, sortFn, sliceFn].reduce((acc, fn) => fn(acc), data)
+}, [data, query, search, columns, sort, comparator, currentPage, datasource])
 ```
 
 ---
 
-### Slide 78: Table - Partial Updates
+### Slide 78: Table - Fetching & Event Handlers
 
-**Step 3**: The secret sauce - `update()` for efficient re-renders
+**Step 3**: Data fetching and user interaction handlers.
 
-Instead of re-rendering the entire table when data changes, we update just the parts that changed:
+Initial load via `useEffect`, and the `next` callback only fetches when we need more data beyond what's accumulated:
 
-```typescript
-update(newConfig: Partial<TTableProps<T>>): void {
-  this.config = { ...this.config, ...newConfig }
+```tsx
+useEffect(() => {
+  if (data.length === 0) {
+    datasource.next(0, datasource.pageSize).then(d => setData(d));
+  }
+}, [datasource]);
 
-  this.renderRows()         // Just update <tbody>
-  this.renderPagination()   // Just update page info + button states
-  this.updateHeaderIcons()  // Just update sort indicators
-}
+const next = useCallback(() => {
+  if (currentPage >= datasource.pages - 1) return;
+  const nextPage = currentPage + 1;
+  setCurrentPage(nextPage);
+  if (data.length <= nextPage * datasource.pageSize && data.length < datasource.pages * datasource.pageSize) {
+    datasource.next(nextPage, datasource.pageSize).then(d => setData(prev => [...prev, ...d]))
+  }
+}, [datasource, currentPage, data.length])
+```
 
-renderRows(): void {
-  this.tbody!.innerHTML = this.config.data
-    .map(row => this.getRowTemplate(row))
-    .join('')
+Sorting uses event delegation on `<thead>` with `data-column-id` attributes, cycling through `asc → desc → none`:
+
+```tsx
+const onSort: React.MouseEventHandler<HTMLTableSectionElement> = ({ target }) => {
+  if (!(target instanceof HTMLElement) || !target.dataset.columnId) return
+  const columnId = target.dataset.columnId as keyof T
+  const column = columns.find((c) => c.id === columnId)
+  if (!column) return
+  setSort(prevSort => {
+    const currentDirection = prevSort?.columnId === columnId ? prevSort.direction : (column.sort ?? 'none');
+    const newDirection = currentDirection === 'desc' ? 'none' : currentDirection === 'asc' ? 'desc' : 'asc';
+    return { columnId, direction: newDirection };
+  });
 }
 ```
 
-This way we don't lose focus on the search input or flicker the whole table!
+Search resets pagination to page 0:
+
+```tsx
+const onSearch: ChangeEventHandler<HTMLInputElement> = ({ target }) => {
+  setQuery(target.value);
+  setCurrentPage(0);
+};
+```
 
 ---
 
-### Slide 79: Component 7 - Reddit Thread
+### Slide 78: Table - Rendering
+
+**Step 4**: Rendering the table with sort indicators and pagination controls.
+
+```tsx
+return (
+  <div className={cx(flex.w100, flex.flexColumnStart)}>
+    <table>
+      <thead onClickCapture={onSort}>
+        <tr>
+          {columns.map((c) => {
+            const currentSort = sort?.columnId === c.id ? sort.direction : c.sort;
+            return (
+              <th data-column-id={c.id} key={c.id}>
+                {c.name}
+                {currentSort === 'asc' ? ' ↑' : currentSort === 'desc' ? ' ↓' : ''}
+              </th>
+            )
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {slice.map((item) => (
+          <tr key={item.id}>
+            {columns.map((col) => (
+              <td key={col.id}>{col.renderer(item)}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    <div className={cx(flex.flexRowCenter, flex.flexGap8, styles.controls)}>
+      <button disabled={currentPage === 0} onClick={prev}>Prev</button>
+      <span>{currentPage + 1} / {datasource.pages}</span>
+      <button disabled={currentPage === datasource.pages - 1} onClick={next}>Next</button>
+      <input type="search" placeholder="Filter" onChange={onSearch} />
+    </div>
+  </div>
+)
+```
+
+Key details: `onClickCapture` on `<thead>` for event delegation, `data-column-id` on each `<th>`, `col.renderer(item)` for custom cell content, and disabled states on pagination buttons at boundaries.
+
+---
+
+### Slide 78: Component 7 - Reddit Thread
 
 If you've ever seen Reddit or Hacker News, you know this one - nested comment threads! Comments can have replies, and those replies can have their own replies, creating a tree structure.
 
@@ -2175,34 +2585,84 @@ Let's think about this:
 
 ---
 
-### Slide 80: Reddit Thread - Recursive Rendering
+### Slide 78: Reddit Thread - Step 1: Input Data Sample
+
+To understand the recursive nature of the problem, let's look at the input data. We are given an array of comment objects, where each comment might have an array of `replies` that look exactly like the parent.
+
+```typescript
+interface IRedditComment {
+  id: string
+  nickname: string
+  text: string
+  date: string
+  replies: IRedditComment[]  // 👈 Recursive!
+}
+
+const comments: IRedditComment[] = [
+  {
+    id: '1', nickname: 'user_one', date: '2h ago',
+    text: 'This is a top-level comment',
+    replies: [
+      {
+        id: '2', nickname: 'user_two', date: '1h ago',
+        text: 'This is a reply',
+        replies: [
+          { id: '3', nickname: 'user_three', date: '30m ago',
+            text: 'Nested reply!', replies: [] }
+        ]
+      }
+    ]
+  }
+]
+```
+
+---
+
+### Slide 78: Reddit Thread - Recursive Rendering
 
 The core insight: a Comment renders its children, which are also Comments!
 
 ```tsx
-// React conceptual example
-const Comment = ({ comment }) => (
-  <article>
-    <header>{comment.nickname}</header>
-    <p>{comment.text}</p>
+function RedditComment({ comment }: { comment: IRedditComment }) {
+  return (
+    <article className={cx(css.comment, flex.padding16)}>
+      <header className={cx(flex.flexRowBetween)}>
+        <strong>{comment.nickname}</strong>
+        <time>{comment.date}</time>
+      </header>
+      <p>{comment.text}</p>
+      {comment.replies.length > 0 && (
+        <details>
+          <summary>Replies</summary>
+          <ul className={cx(flex.paddingLeft16, css.repliesList)}>
+            {comment.replies.map((reply) => (
+              <li key={reply.id}>
+                <RedditComment comment={reply} />  {/* 👈 Recursion! */}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </article>
+  )
+}
 
-    {comment.replies?.length > 0 && (
-      <details>
-        <summary>Replies</summary>
-        {comment.replies.map((reply) => (
-          <Comment key={reply.id} comment={reply} /> // 👈 Recursion!
-        ))}
-      </details>
-    )}
-  </article>
-)
+export const RedditThreadComponent = ({ comments }: { comments: IRedditComment[] }) => {
+  return (
+    <div className={css.container}>
+      {comments.map((comment) => (
+        <RedditComment key={comment.id} comment={comment} />
+      ))}
+    </div>
+  )
+}
 ```
 
-And we're using `<details>/<summary>` again for free collapse/expand!
+`<details>/<summary>` gives us free collapse/expand with no state management needed!
 
 ---
 
-### Slide 81: Reddit Thread - The Vanilla Implementation
+### Slide 78: Reddit Thread - The Vanilla Implementation
 
 In our Vanilla implementation, we use a recursive method:
 
@@ -2236,7 +2696,7 @@ The indentation is handled by CSS - nested `<ul>` elements get `padding-left`.
 
 ---
 
-### Slide 82: Component 8 - Gallery
+### Slide 78: Component 8 - Gallery
 
 Image galleries and carousels are everywhere - product pages, portfolios, slideshows. You have a list of images, showing one at a time with Prev/Next buttons to navigate.
 
@@ -2248,102 +2708,102 @@ Key challenges:
 
 Let's map it out:
 
-- **What do we need?** Show images one at a time, navigate with buttons and keyboard, maybe dot indicators
-- **Data shape?** `images: { src, alt }[]` and track `currentIndex`
-- **The pattern?** **Partial DOM updates** again - we slide the track, disable buttons at boundaries
-- **Accessibility?** Arrow keys for navigation, proper `alt` text on images
+- **What do we need?** Show images one at a time, navigate with buttons and keyboard, maybe dot indicators.
+- **Data shape?** Array of `images` strings, and React state for `currentIndex`.
+- **The pattern?** **Transform translation** - we slide the entire image track `<ul>` based on the index.
+- **Accessibility?** Arrow keys for navigation, proper `aria-label`s on buttons.
 
 ---
 
-### Slide 83: Gallery - Setting Up
+### Slide 78: Gallery - Step 1: Input Data Sample
 
-**Step 1**: Define types and set up the class
+The input for a Gallery is just an array of image URLs that we want to slide through.
 
 ```typescript
-type TGalleryProps = {
-  images: { src: string; alt: string }[]
-}
-
-export class Gallery extends AbstractComponent<TGalleryProps> {
-  private currentIndex = 0
-  private list: HTMLElement | null = null
-  private prevBtn: HTMLButtonElement | null = null
-  private nextBtn: HTMLButtonElement | null = null
-
-  constructor(config: TComponentConfig<TGalleryProps>) {
-    super({ ...config, listeners: ['click'] })
-  }
-
-  init(): void {
-    this.handleKeyDown = this.handleKeyDown.bind(this)
-    window.addEventListener('keydown', this.handleKeyDown)
-  }
-
-  destroy(): void {
-    window.removeEventListener('keydown', this.handleKeyDown)
-  }
+const galleryProps = {
+  images: [
+    'https://example.com/image1.jpg',
+    'https://example.com/image2.jpg',
+    'https://example.com/image3.jpg'
+  ]
 }
 ```
 
 ---
 
-### Slide 84: Gallery - Navigation Logic
+### Slide 78: Gallery - State & Navigation
 
-**Step 2**: Implement navigation with index clamping
+**Step 2**: Use React state and clamped setter functions.
 
-```typescript
-handlePrev(): void {
-  this.goToSlide(Math.max(0, this.currentIndex - 1))
-}
+```tsx
+export const Gallery = ({ images }: TGalleryProps) => {
+  const [currentIndex, setCurrentIndex] = useState(0)
 
-handleNext(): void {
-  this.goToSlide(Math.min(this.config.images.length - 1, this.currentIndex + 1))
-}
+  const handlePrev = useCallback(() => {
+    setCurrentIndex((prev) => Math.max(0, prev - 1))
+  }, [])
 
-goToSlide(index: number): void {
-  if (index === this.currentIndex) return
-  this.currentIndex = index
-  this.updateView()
-}
-
-handleKeyDown(e: KeyboardEvent): void {
-  if (e.key === 'ArrowLeft') this.handlePrev()
-  if (e.key === 'ArrowRight') this.handleNext()
-}
+  const handleNext = useCallback(() => {
+    setCurrentIndex((prev) => Math.min(images.length - 1, prev + 1))
+  }, [images.length])
 ```
 
-`Math.max(0, ...)` and `Math.min(length-1, ...)` keep us in bounds!
+Using `Math.max(0, ...)` and `Math.min(length - 1, ...)` perfectly prevents index out-of-bounds without needing complex `if/else` checks!
 
 ---
 
-### Slide 85: Gallery - Partial DOM Updates
+### Slide 78: Gallery - Keyboard Support
 
-**Step 3**: `updateView()` - the efficient update pattern
+**Step 2**: Global event listener for arrow keys.
 
-```typescript
-updateView(): void {
-  // Slide the track
-  this.list!.style.transform = `translateX(-${this.currentIndex * 100}%)`
-
-  // Update button states
-  this.prevBtn!.disabled = this.currentIndex === 0
-  this.nextBtn!.disabled = this.currentIndex === this.config.images.length - 1
-
-  // Update dot indicators
-  this.dots.forEach((dot, i) => {
-    dot.setAttribute('data-active', String(i === this.currentIndex))
-  })
-
-  // Lazy load: only load current + next 2 images
-  this.lazyLoadImages()
-}
+```tsx
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') handlePrev()
+      if (e.key === 'ArrowRight') handleNext()
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handlePrev, handleNext])
 ```
 
-No full re-render - just update the specific parts that changed!
+Since we attach the listener to `window`, we use `useEffect`. Don't forget the cleanup function to remove the listener and avoid nasty memory leaks!
 
 ---
 
-### Slide 86: Component 9 - Nested Checkboxes
+### Slide 78: Gallery - Rendering & Animation
+
+**Step 3**: The sliding container and lazy-loading images.
+
+```tsx
+return (
+  <section className={cx(flex.w100, flex.pRel, css.container)}>
+    <ul
+      className={cx(flex.itemsStretch, flex.h100, css.list)}
+      style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+    >
+      {images.map((image, i) => (
+        <li key={i} className={cx(flex.wh100, css.item)}>
+          <img
+            src={currentIndex + 2 >= i ? image : undefined}
+            alt={`Gallery image ${i + 1}`}
+          />
+        </li>
+      ))}
+    </ul>
+    {/* Buttons & Indicators */}
+  </section>
+)
+```
+
+**Two neat tricks here:**
+1. `style={{ transform: ... }}` handles the sliding animation cleanly.
+2. `currentIndex + 2 >= i` ensures we only load the current image, plus a small buffer ahead, saving bandwidth!
+
+---
+
+### Slide 78: Component 9 - Nested Checkboxes
 
 Remember the Tree Select problem from Part 1? This is the UI component version! A checkbox tree where:
 
@@ -2352,90 +2812,189 @@ Remember the Tree Select problem from Part 1? This is the UI component version! 
 
 This is super common in file managers, permission settings, and category selectors.
 
-Let's think it through:
+Let's map out our execution steps for Vanilla JavaScript:
 
-- **What do we need?** A tree of checkboxes with parent-child relationships
-- **Data shape?** Tree nodes with `{ name, checked, children[] }` - recursive structure
-- **The pattern?** **Propagate down + Bubble up** - just like DOM events! (Remember our Tree Select?)
-- **Accessibility?** Native `<input type="checkbox">` with `aria-checked="mixed"` for indeterminate
+1. **Input Data Sample**: Understanding the recursive data structure we are given.
+2. **State Normalization**: Flatten the nested tree into a `Record<string, TCheckboxItem>` map so we can instantly look up any node by ID and give each node a `parent` reference.
+3. **Recursive Rendering**: A template function that calls itself for nested children.
+4. **The Indeterminate State**: Handling the `indeterminate` property via native DOM `afterRender`, since there's no native HTML attribute for it.
+5. **Propagate Down**: A recursive function to select/deselect all descendants and update the DOM directly.
+6. **Bubble Up**: A recursive function to update parent states and their DOM elements based on their children.
 
 ---
 
-### Slide 87: Checkboxes - The Indeterminate State
+### Slide 78: Checkboxes - Step 1: Input Data Sample
+
+To understand the recursive nature of the problem, let's look at the input data. We are given an array of objects where each item *might* have `children` that look exactly like the parent.
+
+```typescript
+const MOCK_DATA: TCheckboxItem[] = [
+  {
+    id: '1',
+    label: 'Electronics',
+    children: [
+      {
+        id: '1-1',
+        label: 'Phones',
+        children: [
+          { id: '1-1-1', label: 'iPhone' },
+          { id: '1-1-2', label: 'Android' },
+        ],
+      },
+      { id: '1-2', label: 'Laptops' },
+    ],
+  },
+  {
+    id: '2',
+    label: 'Books',
+    children: [
+      { id: '2-1', label: 'Fiction' },
+      { id: '2-2', label: 'Non-fiction' },
+    ],
+  },
+]
+```
+
+---
+
+### Slide 78: Checkboxes - Step 2: State Normalization
+
+We need a flat map of the state so we can quickly find items and trace their parents.
+
+```typescript
+function process(acc: Record<string, TCheckboxItem>, item: TCheckboxItem, parent?: TCheckboxItem) {
+  acc[item.id] = item
+  item.parent = parent
+  // Inherit selection from parent initially
+  item.selected = item.selected || !!parent?.selected
+
+  item.children?.forEach((child) => process(acc, child, item))
+
+  // Determine initial state based on children
+  if (item.children?.length) {
+    const allChecked = item.children.every((it) => it.selected)
+    const someChecked = item.children.some((it) => it.selected || it.indeterminate)
+
+    item.selected = allChecked
+    item.indeterminate = !allChecked && someChecked
+  }
+
+  return acc
+}
+```
+
+This transforms our deeply nested array into a dictionary, where every node knows its parent! This happens exactly once in the `constructor`.
+
+---
+
+### Slide 78: Checkboxes - Step 3: Recursive Rendering
+
+Instead of just rendering a flat list, we need our template function to call itself!
+
+```typescript
+getCheckboxTemplate = (item: TCheckboxItem): string => {
+  return `
+    <li>
+      <label>
+        <input data-item-id="${item.id}" data-parent-id="${item.parent?.id ?? ''}" type="checkbox" ${item.selected ? 'checked' : ''}>
+        <span class="${cx(flex.paddingLeft8)}">${item.label}</span>
+      </label>
+      ${item.children?.length ? this.getChildrenTemplate(item.children) : ''}
+    </li>`.trim()
+}
+
+getChildrenTemplate = (items: TCheckboxItem[]): string => {
+  return `<ul class="${cx(flex.paddingLeft16)}">${items.map(this.getCheckboxTemplate).join('')}</ul>`
+}
+```
+
+Notice how `getCheckboxTemplate` calls `getChildrenTemplate`, which maps over items and calls `getCheckboxTemplate` again!
+
+---
+
+### Slide 78: Checkboxes - Step 4: The Indeterminate State
 
 Here's something tricky: the **indeterminate** state can only be set via JavaScript!
 
-```typescript
-// This doesn't work:
-<input type="checkbox" indeterminate />  // ❌ Not a valid attribute!
-
-// You MUST do this:
-checkboxRef.indeterminate = true  // ✅ JavaScript property only
+```html
+<!-- This doesn't work: -->
+<input type="checkbox" indeterminate />  <!-- ❌ Not a valid attribute! -->
 ```
 
-This means our `afterRender()` hook needs to loop through and set this property on checkboxes that need it.
+This means after our `toHTML()` template renders, our `afterRender()` hook needs to loop through and set this property on checkboxes that need it.
+
+```typescript
+afterRender() {
+  Object.values(this.state).forEach((item) => {
+    if (item.indeterminate) {
+      const element = this.container!.querySelector(`[data-item-id="${item.id}"]`)
+      if (element instanceof HTMLInputElement) {
+        element.indeterminate = true // ✅ JavaScript property only
+      }
+    }
+  })
+}
+```
 
 ---
 
-### Slide 88: Checkboxes - The Propagate Pattern
+### Slide 78: Checkboxes - Step 5: Propagate Down
 
-**Cascade DOWN**: When a parent is checked, check all descendants
+When a parent is checked or unchecked, we force all its descendants to match! Instead of re-rendering, we update the DOM directly.
 
 ```typescript
-propagate(item: TCheckboxItem, value: boolean): void {
-  // Update DOM directly (no re-render!)
-  const checkbox = this.container!.querySelector(
-    `[data-item-id="${item.id}"]`
-  ) as HTMLInputElement
-  checkbox.checked = value
-  checkbox.indeterminate = false
-
-  // Update state
+propagate(item: TCheckboxItem, value: boolean) {
+  // 1. Update DOM directly!
+  const element = this.container!.querySelector(`[data-item-id="${item.id}"]`)
+  if (element instanceof HTMLInputElement) {
+    element.checked = value
+    element.indeterminate = false
+  }
+  
+  // 2. Update state for truth
   item.selected = value
   item.indeterminate = false
-
-  // Recurse to children
-  item.children?.forEach(child => this.propagate(child, value))
+  
+  // 3. Recurse down!
+  item.children?.forEach((child) => this.propagate(child, value))
 }
 ```
 
-No re-render needed! We update the DOM directly for performance.
-
 ---
 
-### Slide 89: Checkboxes - The Bubble Pattern
+### Slide 78: Checkboxes - Step 6: Bubble Up
 
-**Cascade UP**: When a child changes, update all ancestors
+When a child changes, its parent must re-evaluate if it should be checked, unchecked, or indeterminate. This bubbles all the way to the root!
 
 ```typescript
-bubble(item: TCheckboxItem): void {
+bubble(item: TCheckboxItem) {
   const parent = item.parent
-  if (!parent || !parent.children) return
+  if (!parent) return
 
-  const children = parent.children
-  const allChecked = children.every(c => c.selected)
-  const someChecked = children.some(c => c.selected || c.indeterminate)
+  const parentElement = this.container!.querySelector(`[data-item-id="${parent.id}"]`)
+  if (parentElement instanceof HTMLInputElement) {
+    const children = parent.children || []
+    const allChecked = children.every((it) => it.selected)
+    const someChecked = children.some((it) => it.selected || it.indeterminate)
 
-  parent.selected = allChecked
-  parent.indeterminate = !allChecked && someChecked
+    parent.selected = allChecked
+    parent.indeterminate = !allChecked && someChecked
 
-  // Update parent's DOM
-  const checkbox = this.container!.querySelector(
-    `[data-item-id="${parent.id}"]`
-  ) as HTMLInputElement
-  checkbox.checked = parent.selected
-  checkbox.indeterminate = parent.indeterminate
+    // Update parent DOM
+    parentElement.checked = parent.selected
+    parentElement.indeterminate = parent.indeterminate || false
 
-  // Recurse up to grandparent
-  this.bubble(parent)
+    // Recurse up!
+    this.bubble(parent)
+  }
 }
 ```
 
----
+By separating `propagate` and `bubble`, our `onChange` handler simply grabs the item, calls `propagate`, and calls `bubble`!
 
-### Slide 90: Component 10 - Toast
+### Slide 78: Component 10 - Toast
 
-Last one! Toasts are those notification messages that pop up briefly and then disappear. "Message sent!", "Error saving", "3 items added to cart".
+ Toasts are those notification messages that pop up briefly and then disappear. "Message sent!", "Error saving", "3 items added to cart".
 
 They usually:
 
@@ -2443,94 +3002,203 @@ They usually:
 - Stack up if there are multiple
 - Auto-dismiss after a few seconds with a nice fade-out animation
 
-The key challenge: **removing the DOM element AFTER the animation completes!**
+The key challenge: **removing the element from state AFTER the animation completes!**
 
-Let's plan this:
+Let's plan this with React:
 
 - **What do we need?** Show a message, auto-dismiss with animation, stack multiple toasts
-- **Data shape?** A queue/array of `{ id, message, type }` objects
-- **The pattern?** **animationend event** - wait for CSS animation to finish before removing DOM
-- **Accessibility?** `role="alert"` or `aria-live="polite"` for screen reader announcements
+- **Data shape?** A state array of `{ id, text, removed }` objects
+- **The pattern?** **Context + Portal + useImperativeHandle** for imperative API, **onAnimationEndCapture** for animation lifecycle
+- **Accessibility?** `role="status"` with `aria-live="polite"` for screen reader announcements
 
 ---
 
-### Slide 91: Toast - The animationend Pattern
+### Slide 78: Toast - Step 1: Input Data Sample
 
-We can't just `removeChild()` immediately - we need to wait for the fade-out animation to finish:
+Toasts are triggered imperatively via a `useToast()` hook, not passed as props. The `ToastProvider` wraps your app and renders toasts into a portal target.
+
+```tsx
+// Wrap your app with ToastProvider, pointing to a portal target
+<ToastProvider target="#toast-root">
+  <App />
+</ToastProvider>
+
+// Inside any child component, use the hook
+const { toast } = useToast()
+
+toast({ id: '1', text: 'Settings saved successfully!' })
+toast({ id: '2', text: 'Error connecting to server.' })
+```
+
+---
+
+### Slide 78: Toast - The animationend Pattern
+
+We can't just remove the item from state immediately - we need to wait for the fade-out animation to finish:
 
 ```typescript
 // Wrong ❌ - element disappears abruptly
-element.remove()
+setItems(items => items.filter(it => it.id !== id))
 
-// Right ✅ - wait for animation
-element.classList.add('fadeOut')
-element.addEventListener('animationend', () => {
-  element.remove()
+// Right ✅ - mark as removed, wait for animation, then filter
+setItems(items => items.map(it => ({ ...it, removed: it.id === id ? true : it.removed })))
+// Then in onAnimationEnd, when removed animation finishes:
+setItems(items => items.filter(it => it.id !== target.dataset.id))
+```
+
+We use a `removed` flag + `data-removed` attribute to distinguish fade-in from fade-out animations.
+
+---
+
+### Slide 78: Toast - Types & Context Setup
+
+**Step 1**: Define the imperative API and create a Context to share it.
+
+```tsx
+const TIMER = 3000
+
+export type TToastMethods = {
+  toast: (item: TToastItem) => void
+}
+
+type TToastItem = {
+  id: string
+  text: string
+}
+
+const ToastContext = createContext<TToastMethods>({
+  toast: (_: TToastItem) => { },
 })
 ```
 
-But how do we know WHICH animation ended? We use a data attribute to flag elements that are being removed.
+The Context holds a `toast()` function that any child component can call via `useToast()`.
 
 ---
 
-### Slide 92: Toast - The Implementation
+### Slide 78: Toast - ToastProvider with Portal
 
-**Step 1**: Set up with `animationend` listener
+**Step 2**: The Provider finds the portal target, renders `ToastList` into it, and exposes the API via Context.
 
-```typescript
-export class Toast extends AbstractComponent<TToastProps> {
-  listElement: HTMLUListElement | null = null
+```tsx
+export function ToastProvider({ children, target }: PropsWithChildren<{ target: string }>) {
+  const [targetElement, setTarget] = useState<HTMLElement | null>(null)
+  const toastRef = useRef<TToastMethods>(null)
 
-  constructor(config: TComponentConfig<TToastProps>) {
-    super({ ...config, listeners: ['animationend'] })
-  }
+  useLayoutEffect(() => {
+    if (targetElement == null && target != null) {
+      const element = document.querySelector(target)
+      if (element instanceof HTMLElement) {
+        setTarget(element)
+      }
+    }
+  }, [target, targetElement])
 
-  toHTML(): string {
-    return `<ul class="${css.list}" aria-live="polite"></ul>`
-  }
+  const context = useMemo(() => ({
+    toast: (item: TToastItem) => toastRef.current?.toast(item),
+  }), [])
 
-  afterRender(): void {
-    this.listElement = this.container!.querySelector('ul')
-  }
+  return (
+    <ToastContext.Provider value={context}>
+      {targetElement && createPortal(<ToastList ref={toastRef} />, targetElement)}
+      {children}
+    </ToastContext.Provider>
+  )
+}
+
+export function useToast(): TToastMethods {
+  return useContext(ToastContext)
 }
 ```
 
-Container starts empty - toasts added dynamically!
+`useLayoutEffect` ensures the portal target is found before paint. The `context` object wraps the ref call so consumers don't need to know about the ref.
 
 ---
 
-### Slide 93: Toast - Adding and Removing Toasts
+### Slide 78: Toast - ToastList & Imperative Handle
 
-**Step 2**: The `toast()` method and cleanup handler
+**Step 3**: The internal `ToastList` manages the items array and exposes `toast()` via `useImperativeHandle`.
 
-```typescript
-toast(item: TToastItem): void {
-  const element = this.getToastTemplate(item)
-  this.listElement!.appendChild(element)
+```tsx
+function ToastList({ ref }: { ref: React.Ref<TToastMethods> }) {
+  const [items, setItems] = useState<Array<TToastItem & { removed: boolean }>>([])
 
-  // Auto-dismiss after 3 seconds
-  setTimeout(() => {
-    element.classList.remove(css.fadeIn)
-    element.classList.add(css.fadeOut)
-    element.dataset.removed = 'true'  // 👈 Flag for cleanup
-  }, 3000)
-}
+  useImperativeHandle(ref, () => ({
+    toast: (item: TToastItem) => {
+      setItems((items) => [...items, { ...item, removed: false }])
+    },
+  }))
+```
 
-onAnimationend(event: AnimationEvent): void {
-  const target = event.target as HTMLElement
+When `toast()` is called, it just adds the item to state with `removed: false`. The item gets a `fadeIn` CSS animation automatically.
 
-  // Only remove elements flagged for removal
-  if (target.dataset.removed === 'true') {
-    target.remove()
+---
+
+### Slide 78: Toast - Animation Lifecycle
+
+**Step 4**: `onAnimationEndCapture` handles both fade-in completion (start dismiss timer) and fade-out completion (remove from state).
+
+```tsx
+  const onAnimationEnd: React.AnimationEventHandler<HTMLElement> = ({ target }) => {
+    if (!(target instanceof HTMLElement) || target.dataset.id == null) return
+
+    if (target.dataset.removed === 'true') {
+      // Fade-out finished → remove from state
+      setItems((items) => items.filter((it) => it.id !== target.dataset.id))
+    } else if (target.dataset.removed === 'false') {
+      // Fade-in finished → start auto-dismiss timer
+      setTimeout(() => {
+        setItems((items) =>
+          items.map((it) => ({
+            ...it,
+            removed: target.dataset.id === it.id ? true : it.removed,
+          })),
+        )
+      }, TIMER)
+    }
   }
+```
+
+The `data-removed` attribute is the key: `"false"` means just appeared (start timer), `"true"` means fading out (clean up after animation).
+
+---
+
+### Slide 78: Toast - Rendering
+
+**Step 5**: Render the list with proper a11y attributes and animation classes driven by the `removed` flag.
+
+```tsx
+  return (
+    <ul
+      aria-live="polite"
+      aria-relevant="additions removals"
+      className={cx(css['toast-list'], flex.flexColumnStart)}
+      onAnimationEndCapture={onAnimationEnd}
+    >
+      {items.map((it) => (
+        <li
+          role="status"
+          aria-atomic="true"
+          aria-live="polite"
+          key={it.id}
+          data-removed={it.removed}
+          data-id={it.id}
+          className={`${it.removed ? css.fadeOut : css.fadeIn}`}
+        >
+          <div className={cx(css.toast, flex.flexColumnCenter)}>
+            <p>{it.text}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
 }
 ```
 
-The `data-removed` flag ensures we don't accidentally remove elements during their fade-in animation!
+`onAnimationEndCapture` on the `<ul>` uses event delegation - one handler for all toast items, no individual listeners needed!
 
 ---
 
-### Slide 94: Part 2 Wrap-Up
+### Slide 78: Part 2 Wrap-Up
 
 That's all 10 components! Let's recap the key patterns we covered:
 
@@ -2547,7 +3215,7 @@ The best part? These patterns combine! In a real interview, you'll mix and match
 
 ---
 
-### Slide 95: Part 3 - Advanced Components
+### Slide 78: Part 3 - Advanced Components
 
 Alright, we're getting into the advanced territory now! These next 10 components are more complex and cover patterns you'll often see in senior-level interviews.
 
@@ -2564,382 +3232,477 @@ Ready? Let's go!
 
 ---
 
-### Slide 96: Component 11 - Calculator
+### Slide 78: Component 11 - Calculator
 
 The classic calculator! You see this in basically every UI interview at some point. Buttons for digits, operators, and a display showing the current expression and result.
 
-Sounds easy, but there's a hidden complexity: **state machine thinking**. What happens when you press `2 + 3 × 4`? Do you calculate `5 × 4 = 20` or respect order of operations for `2 + 12 = 14`?
+The key insight here is that the state is just a **string expression** — we build it up character by character and evaluate it at the end. No need for a complex state machine with separate `previousValue`/`operator` tracking!
 
 Let's think it through:
 
 - **What do we need?** Display, digit buttons (0-9), operator buttons (+, -, ×, ÷, =), clear/AC
-- **Data shape?** Current value, pending operation, previous value - basically a mini state machine
-- **The pattern?** **State machine** - track what operation is pending and when to evaluate
+- **Data shape?** A single string `'0'` that accumulates the expression
+- **The pattern?** **BUTTONS Map** — each button maps to an action function that transforms the state string
 - **Accessibility?** Buttons should be keyboard accessible, use `<output>` for display
 
 ---
 
-### Slide 97: Calculator - State Machine Approach
+### Slide 78: Calculator - Step 1: Action Functions
 
-The key insight: a calculator is a **finite state machine**!
-
-```
-States: FIRST_NUMBER, OPERATOR_PENDING, SECOND_NUMBER
-Transitions:
-  - FIRST_NUMBER + digit → update display
-  - FIRST_NUMBER + operator → save value, go to OPERATOR_PENDING
-  - OPERATOR_PENDING + digit → start SECOND_NUMBER
-  - SECOND_NUMBER + operator → evaluate, save result, go to OPERATOR_PENDING
-  - SECOND_NUMBER + "=" → evaluate, go to FIRST_NUMBER
-```
-
-**Data model**:
+**Step 1**: Define the action type and implement the action functions. Each takes `(state, label)` → returns new state string:
 
 ```typescript
-type CalculatorState = {
-  display: string
-  previousValue: number | null
-  operator: '+' | '-' | '*' | '/' | null
-  waitingForSecondOperand: boolean
+type TButtonAction = (state: string, operator: string) => string
+
+// Appends a digit to the expression string.
+// If current state is '0', replaces it (avoids leading zeros like '05')
+// '0' + '5' → '5',  '12' + '3' → '123'
+const applyNumber: TButtonAction = (state, number) =>
+  state === '0' ? number : state + number
+
+// Appends an operator (+, -, *, /, %) to the expression.
+// If the last character is already an operator, replaces it
+// (prevents invalid expressions like '2+-')
+// '5' + '+' → '5+',  '5+' + '*' → '5*'
+const applyOperation: TButtonAction = (state, operator) =>
+  OPERATIONS.has(state.at(-1) ?? '')
+    ? state.slice(0, -1) + operator
+    : state + operator
+
+// Evaluates the expression string using new Function().
+// Returns the result as a string, or INVALID_VALUE on error (e.g. division by zero).
+// '2+3*4' → '14',  '1/0' → 'Invalid value'
+const calculate: TButtonAction = (state) => {
+  try {
+    const result = Number(new Function('return ' + state)())
+    return Number.isNaN(result) || !Number.isFinite(result)
+      ? INVALID_VALUE : toFixedWithoutZeros(result, 5)
+  } catch { return INVALID_VALUE }
+}
+
+// Resets the calculator to initial state
+const clear: TButtonAction = () => '0'
+
+// Wraps the expression in -(…) to negate, or unwraps if already negated
+// '5+3' → '-(5+3)',  '-(5+3)' → '5+3'
+const negate: TButtonAction = (state) =>
+  state.match(/-\(.*\)/) ? state.slice(2, -1) : `-(${state})`
+```
+
+The trick: `new Function('return ' + state)()` evaluates the expression string directly — no need to parse operators manually!
+
+---
+
+### Slide 78: Calculator - Step 2: BUTTONS Map
+
+**Step 2**: Build a `Map` that stores every button's label and behavior, referencing the actions we just defined:
+
+```typescript
+type TCalculatorButton = {
+  label: string
+  action: TButtonAction
+}
+
+const BUTTONS = new Map<string, TCalculatorButton>([
+  ['AC',  { label: 'AC',  action: clear }],
+  ['+/-', { label: '+/-', action: negate }],
+  ['%',   { label: '%',   action: applyOperation }],
+  ['/',   { label: '/',   action: applyOperation }],
+  ['7',   { label: '7',   action: applyNumber }],
+  // ... 8, 9, *, 4, 5, 6, -, 1, 2, 3, +, 0, .
+  ['=',   { label: '=',   action: calculate }],
+])
+```
+
+This Map drives both the **rendering** (iterate to create buttons) and the **logic** (look up action by label on click).
+
+---
+
+### Slide 78: Calculator - Step 3: React Component
+
+**Step 3**: Wire it all up — single `useState<string>('0')`, event delegation via `data-label`:
+
+```tsx
+export const Calculator = () => {
+  const [state, setState] = useState<string>('0')
+
+  const handleButtonClick = ({ target }: React.MouseEvent<HTMLButtonElement>) => {
+    if (target instanceof HTMLElement && target.dataset.label?.length) {
+      const label = target.dataset.label
+      const button = BUTTONS.get(label)
+      if (button) {
+        setState((state) => button.action(state, label))
+      }
+    }
+  }
+
+  return (
+    <div className={cx(styles.flexColumnCenter, styles.bgBlack10, styles.w100, css.calculator)}>
+      <output className={cx(css.output, styles.w100, styles.cWhite10)}>{state}</output>
+      <section className={cx(css.keypad, styles.w100)} onClick={handleButtonClick}>
+        {Array.from(BUTTONS.values()).map((button) => (
+          <button
+            disabled={state === INVALID_VALUE && button.label !== 'AC'}
+            key={button.label}
+            className={cx(css.button, styles.bNone, styles.cWhite10, styles.br128)}
+            data-label={button.label}
+          >
+            {button.label}
+          </button>
+        ))}
+      </section>
+    </div>
+  )
 }
 ```
 
----
-
-### Slide 98: Calculator - Step-by-Step Implementation
-
-Here's how to build it:
-
-1. **Create a BUTTONS Map** - Map each button label to an action function:
-
-   ```typescript
-   const BUTTONS = new Map<string, { label: string; action: TButtonAction }>()
-   ```
-
-2. **Define action functions** for each button type:
-   - `applyNumber(state, digit)` → append digit to display (replace '0' if initial)
-   - `applyOperation(state, op)` → append operator (or replace last operator)
-   - `calculate(state)` → evaluate expression using `new Function('return ' + state)()`
-   - `clear()` → return '0'
-   - `negate(state)` → wrap in `-(...)` or unwrap
-
-3. **Render buttons from the Map** - iterate and create buttons with `data-label`
-
-4. **Single click handler** - event delegation reads `data-label`, looks up action in Map, applies to state
-
-5. **Display with `<output>`** - semantic, accessible element for the result
+One click handler for all buttons — reads `data-label`, looks up the action in the Map, and applies it to state. When state is `INVALID_VALUE`, all buttons except AC are disabled!
 
 ---
 
-### Slide 99: Calculator - The Click Handler
-
-Event delegation with `data-value` and `data-action`:
-
-```typescript
-onClick(event: MouseEvent): void {
-  const target = event.target as HTMLElement
-
-  // Digit pressed?
-  if (target.dataset.value) {
-    this.inputDigit(target.dataset.value)
-  }
-
-  // Operator pressed?
-  if (target.dataset.operator) {
-    this.handleOperator(target.dataset.operator)
-  }
-
-  // Special actions
-  if (target.dataset.action === 'clear') this.reset()
-  if (target.dataset.action === 'equals') this.evaluate()
-}
-```
-
-The beauty is that our `handleOperator` knows to evaluate the pending expression first if needed!
-
----
-
-### Slide 100: Component 12 - Square Game (8-Puzzle)
+### Slide 78: Component 12 - Square Game (8-Puzzle)
 
 Time for something fun - a puzzle game! The 8-puzzle: a 3×3 grid with tiles 1-8 and one empty space. Click a tile adjacent to the empty space to swap them. Goal: arrange tiles in order 1-8.
 
-This is great practice for **grid-based logic** - something that comes up a lot in game dev interviews!
+This is great practice for **grid-based logic** — something that comes up a lot in game dev interviews!
 
 Let's think it through:
 
 - **What do we need?** 3×3 grid, tiles 1-8 + empty, click to swap adjacent tiles, win detection
-- **Data shape?** A 1D array of 9 values (or 2D 3×3) - `[1, 2, 3, 4, 5, 6, 7, 8, null]`
-- **The pattern?** **Adjacency checking** - only swap if Manhattan distance = 1
-- **Accessibility?** Tiles as buttons with semantic labels, announce moves
+- **Data shape?** A 2D array (3×3) — `[[1, 2, 3], [4, 5, 6], [7, 8, null]]`
+- **The pattern?** **Adjacency validation** — only swap if the clicked cell is horizontally or vertically next to the empty cell
+- **Accessibility?** Tiles as interactive divs with `data-row`/`data-col` attributes
 
 ---
 
-### Slide 101: Square Game - Step-by-Step Implementation
+### Slide 78: Square Game - Step 1: Generate Initial State
 
-1. **Initialize state** - Create a 2D array (3×3) with values 1-8 and `null`
-
-2. **Shuffle with Fisher-Yates** - Randomize the initial configuration:
-
-   ```typescript
-   for (let i = 0; i < arr.length; i++) {
-     const j = (Math.floor(Math.random() * arr.length)[(arr[i], arr[j])] = [arr[j], arr[i]])
-   }
-   ```
-
-3. **Render grid** - Map rows → cells, add `data-row` and `data-col` attributes
-
-4. **Click handler** - Find empty cell, check adjacency, swap if valid:
-
-   ```typescript
-   const validHorizontally = row === emptyRow && Math.abs(col - emptyCol) === 1
-   const validVertically = col === emptyCol && Math.abs(row - emptyRow) === 1
-   ```
-
-5. **Win check** - `arr.flat().join('') === '12345678null'`
-
----
-
-### Slide 102: Square Game - Adjacency Logic
-
-The core algorithm: check if the clicked tile is adjacent to the empty cell.
+**Step 1**: Build the shuffled 2D game board. We need three utility functions:
 
 ```typescript
-// Convert 1D index to 2D coordinates
-const toCoords = (index: number) => ({
-  row: Math.floor(index / 3),
-  col: index % 3,
-})
+// Shuffle array using sort with random comparator
+function randomizeArray(arr: Array<number | null>): Array<number | null> {
+  return arr.sort(() => Math.random() - 0.5)
+}
 
-function canSwap(clickedIndex: number, emptyIndex: number): boolean {
-  const clicked = toCoords(clickedIndex)
-  const empty = toCoords(emptyIndex)
+// Split a 1D array into rows of size n → 2D grid
+function chunkify(arr: Array<number | null>, n: number): Array<Array<number | null>> {
+  return Array.from(Array(n), (_, i) => arr.slice(i * n, (i + 1) * n))
+}
 
-  // Manhattan distance must be exactly 1
-  const distance = Math.abs(clicked.row - empty.row) + Math.abs(clicked.col - empty.col)
-  return distance === 1
+// Create shuffled game state:
+// 1. Generate [1, 2, 3, ..., 8, null]
+// 2. Shuffle it
+// 3. Split into 3×3 grid
+function getGameState(size: number): Array<Array<number | null>> {
+  const arr = randomizeArray(
+    Array(size * size)
+      .fill(null)
+      .map((_, i) => (i === size * size - 1 ? null : i + 1))
+  )
+  return chunkify(arr, size)
 }
 ```
 
-If `canSwap` returns true, just swap the values in the array and re-render!
+`getGameState(3)` might return `[[4, 1, 3], [7, 2, 5], [8, null, 6]]` — a random starting position.
 
 ---
 
-### Slide 103: Square Game - Win Detection
+### Slide 78: Square Game - Step 2: Game Logic Functions
+
+**Step 2**: Implement the three core game logic functions:
 
 ```typescript
-const WINNING_STATE = [1, 2, 3, 4, 5, 6, 7, 8, null]
+type TPosition = [row: number, col: number]
 
-function checkWin(grid: (number | null)[]): boolean {
-  return grid.every((tile, index) => tile === WINNING_STATE[index])
+// Validate if a move is legal — clicked cell must be adjacent
+// (horizontally OR vertically) to the empty cell
+function validate(
+  [row, col]: TPosition,
+  [emptyRow, emptyCol]: TPosition
+) {
+  const validHorizontally = row === emptyRow && (col === emptyCol + 1 || col === emptyCol - 1)
+  const validVertically = col === emptyCol && (row === emptyRow + 1 || row === emptyRow - 1)
+  return validHorizontally || validVertically
+}
+
+// Find the [row, col] of the empty cell (null) in the grid
+function getEmptyPosition(arr: Array<Array<number | null>>): TPosition {
+  for (let row = 0; row < arr.length; row++) {
+    for (let col = 0; col < arr[0].length; col++) {
+      if (arr[row][col] === null) return [row, col]
+    }
+  }
+  throw Error('Invalid array')
+}
+
+// Win check — flatten grid and verify tiles are in order 1..n, null at end
+function isWin(arr: Array<Array<number | null>>): boolean {
+  const flat = arr.flat()
+  return flat.every((val, i) => i === flat.length - 1 ? val === null : val === i + 1)
 }
 ```
 
-Call this after every successful swap. If it returns true, show a "You won!" message!
-
-**Bonus challenge**: Not all random configurations are solvable. The puzzle has "parity" - half of all configurations can never be solved. For an interview, you might skip this detail, but it's good to know!
+The `validate` function is the heart of the puzzle — it ensures only tiles next to the empty space can move!
 
 ---
 
-### Slide 104: Component 13 - Typeahead (Autocomplete)
+### Slide 78: Square Game - Step 3: Rendering
+
+**Step 3**: Render the grid as HTML using `data-row` and `data-col` attributes for event delegation:
+
+```typescript
+toHTML() {
+  const cells = this.state
+    .map((row, rowIndex) => {
+      return row
+        .map((col, colIndex) => {
+          const cellClass = col === null ? css.cell__empty : css.cell__filled
+          return `
+            <div
+              class="${css.cell} ${cellClass}"
+              data-row="${rowIndex}"
+              data-col="${colIndex}"
+            >
+              ${col == null ? '' : col}
+            </div>`
+        })
+        .join('')
+    })
+    .join('')
+
+  return `
+    <section class="${css.container}">
+      <div>Game status: ${isWin(this.state) ? 'win' : 'not yet'}</div>
+      <div class="${css.board}">
+        ${cells}
+      </div>
+    </section>
+  `
+}
+```
+
+Each cell stores its `data-row` and `data-col` — no need for individual click listeners!
+
+---
+
+### Slide 78: Square Game - Step 4: Click Handler
+
+**Step 4**: Handle clicks — read coordinates from `data-*`, validate adjacency, swap and re-render:
+
+```typescript
+onClick(e: Event) {
+  const target = e.target as HTMLElement
+  const row = Number(target.dataset.row)
+  const col = Number(target.dataset.col)
+
+  if (isNaN(row) || isNaN(col)) return
+
+  const [emptyRow, emptyCol] = getEmptyPosition(this.state)
+  if (validate([row, col], [emptyRow, emptyCol])) {
+    const newState = structuredClone(this.state);
+    [newState[row][col], newState[emptyRow][emptyCol]] =
+      [newState[emptyRow][emptyCol], newState[row][col]]
+    this.state = newState
+    this.render()
+  }
+}
+```
+
+Key detail: we clone the state with `structuredClone()` before mutating — this ensures immutable updates! The `render()` call at the end re-generates the HTML, and `isWin()` in `toHTML()` automatically shows the win status.
+
+---
+
+### Slide 78: Component 13 - Typeahead (Autocomplete)
 
 Typeahead is a HUGE interview question! Type in a search box, get suggestions. Sounds simple but there's a lot happening:
 
 - **Debouncing** - Don't spam the API on every keystroke
 - **Race conditions** - What if a slow response returns after a fast one?
-- **Large datasets** - How do you search efficiently?
 
 This is one of those components where getting the async handling right is the whole challenge!
 
 Let's think it through:
 
 - **What do we need?** Input, dropdown of suggestions, handle selection
-- **Data shape?** Query string, loading state, results array, selected index
-- **The pattern?** **Debounce + Race condition handling** with AbortController or ignore flags
-- **Accessibility?** `role="combobox"`, `aria-expanded`, keyboard navigation
+- **Data shape?** Query string, loading state, results array
+- **The pattern?** **useDeferredValue + Race condition handling** with AbortController
+- **Accessibility?** `role="combobox"`, `aria-expanded`, `aria-live` for result count
+- **Provided?** A Trie data structure for efficient prefix search (O(L) lookup)
 
 ---
 
-### Slide 105: Typeahead - Step-by-Step Implementation
+### Slide 78: Typeahead - Step 1: Input Data Sample
 
-1. **Build a Trie** - Alphabet-indexed children array (27 for a-z + space):
-
-   ```typescript
-   class TrieNode<T> {
-     value: T | null = null
-     isEnd = false
-     index: (TrieNode<T> | undefined)[] = Array(27)
-   }
-   ```
-
-2. **Insert entries on mount** - For each entry, traverse and create nodes
-
-3. **Use `useDeferredValue`** - Prevents input lag during heavy filtering
-
-4. **Handle race conditions** with ignore flag:
-
-   ```typescript
-   let ignore = false
-   onQuery(query).then((data) => {
-     if (!ignore) setResults(data)
-   })
-   return () => {
-     ignore = true
-   }
-   ```
-
-5. **Live region for accessibility** - `<div role="status" aria-live="polite">{count} results</div>`
-
-6. **Periodic cache clear** - Reset Trie every 60 seconds to avoid stale data
-
----
-
-### Slide 106: Typeahead - The Trie Data Structure
-
-For **client-side** filtering of large datasets, a Trie (Prefix Tree) is O(L) where L is the key length:
+The Typeahead component needs a function that takes the current search query and returns a Promise containing the array of suggestions.
 
 ```typescript
-class TrieNode {
-  children = new Map<string, TrieNode>()
-  isEndOfWord = false
-  word: string | null = null
-}
-
-class Trie {
-  root = new TrieNode()
-
-  insert(word: string): void {
-    let node = this.root
-    for (const char of word.toLowerCase()) {
-      if (!node.children.has(char)) {
-        node.children.set(char, new TrieNode())
-      }
-      node = node.children.get(char)!
-    }
-    node.isEndOfWord = true
-    node.word = word
-  }
-
-  search(prefix: string, limit = 10): string[] {
-    // Navigate to prefix node, then DFS for all words
-  }
+const typeaheadProps = {
+  // A mock async search function
+  search: async (query: string) => {
+    const database = ['Apple', 'Banana', 'Cherry', 'Date']
+    return database.filter(item => 
+      item.toLowerCase().includes(query.toLowerCase())
+    )
+  },
+  onSelect: (item: string) => console.log('User picked:', item)
 }
 ```
 
 ---
 
-### Slide 107: Typeahead - Race Condition Handling
+### Slide 78: Typeahead - Step 2: Types & Trie Setup
 
-The classic async footgun: user types "a" (slow response) then "ab" (fast response). We don't want stale "a" results overwriting "ab" results!
+**Step 1**: Define the entry type and set up the Trie (provided to you) for client-side caching:
 
-**Solution 1: Ignore flag in useEffect cleanup**
+```tsx
+export type TTypeaheadEntry<T> = {
+  query: string
+  id: string
+  value: T
+}
 
-```typescript
-useEffect(() => {
-  let ignore = false
-
-  fetch(`/api/search?q=${query}`)
-    .then((res) => res.json())
-    .then((data) => {
-      if (!ignore) setResults(data) // Only update if not stale
-    })
-
-  return () => {
-    ignore = true
-  } // Mark as stale on cleanup
-}, [query])
-```
-
-**Solution 2: AbortController**
-
-```typescript
-const controller = new AbortController()
-fetch(url, { signal: controller.signal })
-// In cleanup: controller.abort()
-```
-
----
-
-### Slide 108: Component 14 - Heatmap (Canvas)
-
-Canvas rendering is a whole different world from DOM manipulation. A heatmap visualizes data density on a grid - think of those "activity contribution" charts on GitHub.
-
-This introduces working with the **Canvas API**, which is common in data visualization interviews.
-
-Let's think it through:
-
-- **What do we need?** Grid of cells, color intensity based on value, responsive sizing
-- **Data shape?** `Map<"x-y", { value: number }>` for sparse grid, or 2D array for dense
-- **The pattern?** **Canvas rendering** with ResizeObserver for responsive sizing
-- **Accessibility?** Canvas is inherently not accessible - provide alternative text or data table
-
----
-
-### Slide 109: Heatmap - Step-by-Step Implementation
-
-1. **Create HeatmapChart class** - Shared logic for React/Vanilla
-
-2. **Store points in a Map** - Key is `"x-y"`, value accumulates:
-
-   ```typescript
-   const existing = this.map.get(key)
-   const next = { ...point, value: clamp(0, 1, (existing?.value || 0) + point.value) }
-   ```
-
-3. **Calculate cell sizes from parent bounds**:
-
-   ```typescript
-   const cellSize = Math.max(MIN_SIZE, Math.min(availableWidth, availableHeight) / gridSize)
-   ```
-
-4. **Render sequence**: Clear → Draw points → Draw grid lines on top
-
-5. **ResizeObserver** - Sync canvas resolution with CSS size:
-
-   ```typescript
-   this.canvas.width = width
-   this.canvas.height = height
-   ```
-
-6. **Per-cell alpha** - Each cell gets `rgba(255, 0, 0, value)` where value ∈ [0,1]
-
----
-
-### Slide 110: Heatmap - Canvas Basics
-
-```typescript
-class HeatmapChart {
-  private ctx: CanvasRenderingContext2D
-  private data = new Map<string, number>()
-
-  render(): void {
-    const { width, height } = this.canvas.getBoundingClientRect()
-
-    // Set internal resolution to match display
-    this.canvas.width = width
-    this.canvas.height = height
-
-    const cellWidth = width / this.gridSize
-    const cellHeight = height / this.gridSize
-
-    // Clear and redraw
-    this.ctx.clearRect(0, 0, width, height)
-
-    // Draw data points
-    this.data.forEach((value, key) => {
-      const [x, y] = key.split('-').map(Number)
-      this.ctx.fillStyle = `rgba(255, 0, 0, ${Math.min(value, 1)})`
-      this.ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight)
-    })
-
-    // Draw grid lines
-    this.drawGrid(cellWidth, cellHeight)
-  }
+type TTypeaheadProps<T> = {
+  id?: string
+  entries?: TTypeaheadEntry<T>[]
+  onQuery: (query: string) => Promise<TTypeaheadEntry<T>[]>
+  itemRender: (item: TTypeaheadEntry<T>) => React.ReactNode
 }
 ```
 
+The Trie is imported from `./trie` — it supports `insert(key, value)` and `getWithPrefix(prefix)` for O(L) prefix lookups. We use it as a **client-side cache** that accumulates results across queries.
+
 ---
 
-### Slide 111: Component 15 - Progress Bar
+### Slide 78: Typeahead - Step 3: State & Helpers
+
+**Step 2**: Set up state and two helper functions that work with the Trie:
+
+```tsx
+export function Typeahead<T>({ id = 'typeahead', entries = [], onQuery, itemRender }: TTypeaheadProps<T>) {
+  const trieRef = useRef<Trie<TTypeaheadEntry<T>>>(new Trie())
+
+  const [items, setItems] = useState<TTypeaheadEntry<T>[]>([])
+  const [query, setQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const deferredQuery = useDeferredValue(query)
+
+  // Insert entries into the Trie cache
+  const updateTrie = useCallback(
+    (entries: TTypeaheadEntry<T>[]) =>
+      entries.forEach((entry) => trieRef.current.insert(entry.query, entry)),
+    [],
+  )
+
+  // Read cached results from the Trie
+  const updateVisibleItems = useCallback(() => {
+    setItems(trieRef.current.getWithPrefix(deferredQuery))
+  }, [deferredQuery])
+```
+
+`useDeferredValue` prevents input lag — React prioritizes the typing over re-rendering the results list. The Trie acts as a local cache: once "apple" is fetched, typing "app" later returns it instantly!
+
+---
+
+### Slide 78: Typeahead - Step 4: Async Fetching & Race Conditions
+
+**Step 3**: Fetch from the API when the deferred query changes. An **AbortController** prevents stale responses and aborts ongoing slow requests:
+
+```tsx
+  // Seed trie with initial entries
+  useEffect(() => {
+    trieRef.current = new Trie()
+    updateTrie(entries)
+  }, [entries, updateTrie])
+
+  // Fetch on query change with race condition handling
+  useEffect(() => {
+    updateVisibleItems()   // Show cached results immediately
+    setIsLoading(true)
+
+    const controller = new AbortController()
+
+    onQuery(deferredQuery, controller.signal)
+      .then((entries) => {
+        updateTrie(entries)    // Cache new results in Trie
+        updateVisibleItems()   // Update UI with merged results
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') return // ← stale request aborted
+        console.error(error)
+      })
+      .finally(() => {
+        if (controller.signal.aborted) return
+        setIsLoading(false)
+      })
+
+    return () => controller.abort() // Abort previous fetch on cleanup
+  }, [deferredQuery, onQuery, updateTrie, updateVisibleItems])
+```
+
+The flow: user types "a" → show cached "a" results → fetch new "a" results → user types "ab" → cleanup calls `abort()` on the previous controller → slow "a" request is cancelled instantly!
+
+---
+
+### Slide 78: Typeahead - Step 5: Cache Invalidation
+
+**Step 4**: Periodically clear the Trie cache to avoid stale data:
+
+```tsx
+  useEffect(() => {
+    const id = setInterval(() => {
+      trieRef.current = new Trie()
+      updateTrie(entries)
+    }, 60 * 1000)
+    return () => clearInterval(id)
+  }, [entries, updateTrie])
+```
+
+Every 60 seconds, reset the Trie back to just the initial entries. This prevents the cache from growing indefinitely and ensures data freshness.
+
+---
+
+### Slide 78: Typeahead - Step 6: Rendering
+
+**Step 5**: Render with proper ARIA attributes for the **combobox** pattern:
+
+```tsx
+  return (
+    <section className={styles.container}>
+      <div role="status" aria-live="polite" className={styles.visuallyHidden}>
+        {items.length} results available.
+      </div>
+      <input
+        id={id}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={items.length > 0}
+        aria-controls={`${id}-listbox`}
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {(items.length > 0 || isLoading) && (
+        <ul id={`${id}-listbox`} role="listbox">
+          {items.map((item) => (
+            <li tabIndex={0} role="option" aria-selected={false} key={item.id}>
+              {itemRender(item)}
+            </li>
+          ))}
+          {isLoading && <li role="status">Loading...</li>}
+        </ul>
+      )}
+    </section>
+  )
+}
+```
+
+The hidden `role="status"` div announces result count to screen readers. `aria-expanded` and `aria-controls` link the input to the listbox. The `isLoading` state shows a "Loading..." item at the bottom of the list!
+
+---
+
+### Slide 78: Component 15 - Progress Bar
 
 Progress bars seem trivial, but there's a clever CSS trick: **clip-path for text color inversion**!
 
@@ -2954,7 +3717,21 @@ Let's think it through:
 
 ---
 
-### Slide 112: Progress Bar - Step-by-Step Implementation
+### Slide 78: Progress Bar - Step 1: Input Data Sample
+
+The Progress Bar takes the current progress value and the maximum possible value.
+
+```typescript
+const progressBarProps = {
+  value: 45, // Current progress 
+  max: 100,  // Maximum value (defaults to 100)
+  label: 'Uploading...' // Optional text label
+}
+```
+
+---
+
+### Slide 78: Progress Bar - Step-by-Step Implementation
 
 1. **Calculate percentage**: `percentage = Math.min(100, Math.max(0, (value / max) * 100))`
 
@@ -2977,7 +3754,7 @@ Let's think it through:
 
 ---
 
-### Slide 113: Progress Bar - The Clip-Path Trick
+### Slide 78: Progress Bar - The Clip-Path Trick
 
 The secret: **two labels, one clipped**!
 
@@ -3007,7 +3784,7 @@ As the bar fills, update `translateX` on `.fill` and `clip-path: inset(0 ${100-p
 
 ---
 
-### Slide 114: Component 16 - File Upload
+### Slide 78: Component 16 - File Upload
 
 File uploads are everywhere - profile pictures, document attachments, drag-and-drop zones. This component combines **File API** knowledge with good UX patterns.
 
@@ -3026,7 +3803,24 @@ Let's think it through:
 
 ---
 
-### Slide 115: File Upload - Step-by-Step Implementation
+### Slide 78: File Upload - Step 1: Input Data Sample
+
+A file upload component usually manages its own internal state of selected `File` objects from the browser, but it takes configuration props for validation.
+
+```typescript
+const uploadProps = {
+  accept: 'image/png, image/jpeg',
+  maxSize: 5 * 1024 * 1024, // 5MB limit
+  onUpload: async (files: File[]) => {
+    // Send to backend via FormData
+    console.log('Uploading', files.length, 'files');
+  }
+}
+```
+
+---
+
+### Slide 78: File Upload - Step-by-Step Implementation
 
 1. **Hidden file input + button trigger**:
 
@@ -3047,7 +3841,7 @@ Let's think it through:
 
 ---
 
-### Slide 116: File Upload - Drop Zone Events
+### Slide 78: File Upload - Drop Zone Events
 
 ```typescript
 // Prevent browser from opening the file
@@ -3078,7 +3872,7 @@ handleFiles(files: File[]): void {
 
 ---
 
-### Slide 117: Component 17 - Portfolio Visualizer
+### Slide 78: Component 17 - Portfolio Visualizer
 
 This is a real-world component: a tree of investment allocations where editing a leaf value propagates UP to update all parent totals!
 
@@ -3093,7 +3887,31 @@ Let's think it through:
 
 ---
 
-### Slide 118: Portfolio Visualizer - Step-by-Step Implementation
+### Slide 78: Portfolio Visualizer - Step 1: Input Data Sample
+
+The Portfolio Visualizer takes a recursive tree of investment data, where parent nodes (categories) aggregate the values of their children (assets).
+
+```typescript
+const portfolioData = {
+  name: 'Total Portfolio',
+  value: 0, // Computed automatically!
+  children: [
+    {
+      name: 'Stocks', 
+      value: 0,
+      children: [
+        { name: 'AAPL', value: 5000 },
+        { name: 'TSLA', value: 3000 }
+      ]
+    },
+    { name: 'Bonds', value: 2000 }
+  ]
+}
+```
+
+---
+
+### Slide 78: Portfolio Visualizer - Step-by-Step Implementation
 
 1. **Flatten tree into a Map** - Add `parentID` to each node for upward traversal:
 
@@ -3123,7 +3941,7 @@ Let's think it through:
 
 ---
 
-### Slide 119: Portfolio Visualizer - Tree Recalculation
+### Slide 78: Portfolio Visualizer - Tree Recalculation
 
 The core algorithm: traverse tree and recompute parent values from children.
 
@@ -3150,7 +3968,7 @@ Call this after any leaf edit, passing the root node. React will re-render with 
 
 ---
 
-### Slide 120: Component 18 - Markdown Editor
+### Slide 78: Component 18 - Markdown Editor
 
 A live markdown editor with preview - type on the left, see rendered HTML on the right. This combines **parsing** with **split-pane UI**.
 
@@ -3165,7 +3983,22 @@ Let's think it through:
 
 ---
 
-### Slide 121: Markdown - Basic Parser Approach
+### Slide 78: Markdown Editor - Step 1: Input Data Sample
+
+The input for a Markdown Editor is just the raw markdown string and an onChange handler.
+
+```typescript
+const markdownProps = {
+  initialValue: '# Hello World\n\nThis is **bold** text!',
+  onChange: (markdown: string, html: string) => {
+    // Save to database, etc.
+  }
+}
+```
+
+---
+
+### Slide 78: Markdown - Basic Parser Approach
 
 For interviews, you might implement a simple subset:
 
@@ -3192,7 +4025,7 @@ For production, use a proper parser like `marked` or `remark`!
 
 ---
 
-### Slide 122: Component 19 - GPT Chat (Streaming)
+### Slide 78: Component 19 - GPT Chat (Streaming)
 
 This is a modern must-know: streaming responses from an API and displaying them with a typing animation. Think ChatGPT's interface!
 
@@ -3207,7 +4040,27 @@ Let's think it through:
 
 ---
 
-### Slide 123: GPT Chat - Step-by-Step Implementation
+### Slide 78: GPT Chat - Step 1: Input Data Sample
+
+A GPT Chat component manages an ongoing conversation array, and frequently receives new chunks of text from a streaming API.
+
+```typescript
+// Initial state
+const conversation = [
+  { role: 'user', content: 'Explain quantum computing.' },
+  { role: 'assistant', content: 'Quantum computing is...' }
+]
+
+// The component is designed to handle raw text chunks arriving 
+// over time, e.g., from a ReadableStream:
+// Chunk 1: "It "
+// Chunk 2: "uses "
+// Chunk 3: "qubits."
+```
+
+---
+
+### Slide 78: GPT Chat - Step-by-Step Implementation
 
 1. **Create `useMarkdownStream` hook** - Returns `{ stream, abort, inProgress }`:
 
@@ -3239,7 +4092,7 @@ Let's think it through:
 
 ---
 
-### Slide 124: GPT Chat - Streaming Fetch
+### Slide 78: GPT Chat - Streaming Fetch
 
 ```typescript
 async function streamResponse(onChunk: (text: string) => void): Promise<void> {
@@ -3259,7 +4112,7 @@ async function streamResponse(onChunk: (text: string) => void): Promise<void> {
 
 ---
 
-### Slide 125: GPT Chat - Typing Animation
+### Slide 78: GPT Chat - Typing Animation
 
 ```typescript
 function typeText(chunks: string[], onChar: (char: string) => void): void {
@@ -3289,7 +4142,7 @@ Buffer incoming chunks and type them out one character at a time with `requestAn
 
 ---
 
-### Slide 126: Component 20 - Infinite Canvas
+### Slide 78: Component 20 - Infinite Canvas
 
 Our final component! An infinite, pannable, zoomable canvas - think Figma, Miro, or Google Maps.
 
@@ -3304,7 +4157,23 @@ Let's think it through:
 
 ---
 
-### Slide 127: Infinite Canvas - Pan and Zoom
+### Slide 78: Infinite Canvas - Step 1: Input Data Sample
+
+An Infinite Canvas manages an array of elements (shapes, text, images) with absolute coordinates, alongside the current viewport offset and zoom scale.
+
+```typescript
+const canvasState = {
+  viewport: { x: 0, y: 0, scale: 1 },
+  elements: [
+    { id: '1', type: 'rectangle', x: 100, y: 150, width: 200, height: 100 },
+    { id: '2', type: 'text', x: 300, y: 300, content: 'Hello World' }
+  ]
+}
+```
+
+---
+
+### Slide 78: Infinite Canvas - Pan and Zoom
 
 ```typescript
 class InfiniteCanvas {
@@ -3339,7 +4208,7 @@ class InfiniteCanvas {
 
 ---
 
-### Slide 128: Infinite Canvas - Zoom to Cursor
+### Slide 78: Infinite Canvas - Zoom to Cursor
 
 ```typescript
 onWheel(event: WheelEvent): void {
@@ -3366,7 +4235,7 @@ The math ensures the point under your cursor stays in place as you zoom!
 
 ---
 
-### Slide 129: Component 21 - Google Sheets (The Big One!)
+### Slide 78: Component 21 - Google Sheets (The Big One!)
 
 Alright, this is the BOSS LEVEL component - a spreadsheet like Google Sheets or Excel! This isn't just one component, it's **4 interconnected parts** that test everything you've learned:
 
@@ -3388,7 +4257,26 @@ Let's break it down piece by piece!
 
 ---
 
-### Slide 130: Part 1 - Parser & Tokenizer (The Brain)
+### Slide 78: Google Sheets - Step 1: Input Data Sample
+
+A basic spreadsheet engine requires a map of raw cell values (including formulas) and a way to retrieve the evaluated results.
+
+```typescript
+// Raw cell data entered by the user
+const rawData = new Map([
+  ['A1', '10'],
+  ['A2', '20'],
+  ['A3', '=SUM(A1, A2)'], // Formula referencing other cells
+  ['B1', '=A3 * 2']
+])
+
+// The engine evaluates this into:
+// A1: 10, A2: 20, A3: 30, B1: 60
+```
+
+---
+
+### Slide 78: Part 1 - Parser & Tokenizer (The Brain)
 
 First question: How do we even understand `=A1+B1*2`?
 
@@ -3414,7 +4302,7 @@ Stack:
 
 ---
 
-### Slide 131: Parser - Tokenizer Implementation
+### Slide 78: Parser - Tokenizer Implementation
 
 Step 1: Break the string into tokens:
 
@@ -3442,7 +4330,7 @@ tokens.push({ t: 'op', op: isUnary ? 'NEG' : '-' })
 
 ---
 
-### Slide 132: Parser - Shunting-Yard Algorithm
+### Slide 78: Parser - Shunting-Yard Algorithm
 
 Step 2: Convert tokens to RPN using Dijkstra's Shunting-Yard:
 
@@ -3471,7 +4359,7 @@ while (ops.length) output.push(ops.pop())
 
 ---
 
-### Slide 133: Parser - Step-by-Step Implementation
+### Slide 78: Parser - Step-by-Step Implementation
 
 Here's the complete parser implementation plan:
 
@@ -3495,7 +4383,7 @@ Here's the complete parser implementation plan:
 
 ---
 
-### Slide 134: Part 2 - Topological Sorting (The Order)
+### Slide 78: Part 2 - Topological Sorting (The Order)
 
 Here's the problem: When `A1` changes, which cells need recalculating?
 
@@ -3519,7 +4407,7 @@ Dependency Graph:
 
 ---
 
-### Slide 135: Topological Sort - Kahn's Algorithm
+### Slide 78: Topological Sort - Kahn's Algorithm
 
 We use **Kahn's algorithm** to find the correct order:
 
@@ -3575,7 +4463,7 @@ function topoSort(affected, getDeps, getRevDeps) {
 
 ---
 
-### Slide 136: Topological Sort - Cycle Detection
+### Slide 78: Topological Sort - Cycle Detection
 
 What if we have a circular reference?
 
@@ -3602,7 +4490,7 @@ Cyclic cells display: `#CYCLE!`
 
 ---
 
-### Slide 137: Topological Sort - Step-by-Step Implementation
+### Slide 78: Topological Sort - Step-by-Step Implementation
 
 1. **affectedFrom(start, getRevDeps)** - Find all cells to recalculate:
 
@@ -3628,7 +4516,7 @@ Cyclic cells display: `#CYCLE!`
 
 ---
 
-### Slide 138: Part 3 - Table Engine (The Core)
+### Slide 78: Part 3 - Table Engine (The Core)
 
 The Table Engine is the **brain** that ties everything together:
 
@@ -3655,7 +4543,7 @@ The Table Engine is the **brain** that ties everything together:
 
 ---
 
-### Slide 139: Table Engine - Internal State
+### Slide 78: Table Engine - Internal State
 
 The engine maintains 5 Maps:
 
@@ -3682,7 +4570,7 @@ User input:   A1="10", B1="20", C1="=A1+B1", D1="=C1*2"
 
 ---
 
-### Slide 140: Table Engine - setRaw Flow
+### Slide 78: Table Engine - setRaw Flow
 
 The most important method - when a cell changes:
 
@@ -3706,7 +4594,7 @@ setRaw(id: CellId, raw: string): { changed: CellId[] } {
 
 ---
 
-### Slide 141: Table Engine - RPN Evaluation
+### Slide 78: Table Engine - RPN Evaluation
 
 Evaluating a compiled formula is just stack operations:
 
@@ -3741,7 +4629,7 @@ Evaluating a compiled formula is just stack operations:
 
 ---
 
-### Slide 142: Table Engine - Step-by-Step Implementation
+### Slide 78: Table Engine - Step-by-Step Implementation
 
 1. **Constructor** - Initialize 5 empty Maps
 
@@ -3765,7 +4653,7 @@ Evaluating a compiled formula is just stack operations:
 
 ---
 
-### Slide 143: Part 4 - User Experience (The UI)
+### Slide 78: Part 4 - User Experience (The UI)
 
 Finally, the visual part! Building a spreadsheet UI with React:
 
@@ -3792,7 +4680,7 @@ Key features:
 
 ---
 
-### Slide 144: Google Sheet UI - Cell Component
+### Slide 78: Google Sheet UI - Cell Component
 
 The cell is the building block:
 
@@ -3821,7 +4709,7 @@ function Cell({ column, row, value }: TCellProps) {
 
 ---
 
-### Slide 145: Google Sheet UI - Focus/Blur Handling
+### Slide 78: Google Sheet UI - Focus/Blur Handling
 
 The magic of switching between raw formula and computed value:
 
@@ -3849,7 +4737,7 @@ Notice: We use `onFocusCapture` and `onBlurCapture` for event delegation!
 
 ---
 
-### Slide 146: Google Sheet UI - Formatting Toolbar
+### Slide 78: Google Sheet UI - Formatting Toolbar
 
 Format buttons toggle CSS classes without losing focus:
 
@@ -3875,7 +4763,7 @@ const handleFormatting = ({ target }) => {
 
 ---
 
-### Slide 147: Google Sheet UI - Step-by-Step Implementation
+### Slide 78: Google Sheet UI - Step-by-Step Implementation
 
 1. **Pre-render grid structure**:
 
@@ -3899,7 +4787,7 @@ const handleFormatting = ({ target }) => {
 
 ---
 
-### Slide 148: Google Sheets - Complete Architecture
+### Slide 78: Google Sheets - Complete Architecture
 
 Here's how all 4 parts connect:
 
@@ -3934,7 +4822,7 @@ User types "=A1+B1" in C1
 
 ---
 
-### Slide 149: Google Sheets - Error Handling Summary
+### Slide 78: Google Sheets - Error Handling Summary
 
 | Error     | Cause                        | Display   |
 | --------- | ---------------------------- | --------- |
@@ -3946,7 +4834,7 @@ Error propagation is automatic - if A1 shows `#ERROR`, then any cell referencing
 
 ---
 
-### Slide 150: Google Sheets - Key Patterns Recap
+### Slide 78: Google Sheets - Key Patterns Recap
 
 This monster component taught us:
 
@@ -3962,7 +4850,7 @@ If you can build this from scratch, you can build **anything**! 🏆
 
 ---
 
-### Slide 151: Part 3 Wrap-Up
+### Slide 78: Part 3 Wrap-Up
 
 Congrats! You've now seen **21 UI components** covering a huge range of patterns:
 
@@ -3983,7 +4871,7 @@ Congrats! You've now seen **21 UI components** covering a huge range of patterns
 
 ---
 
-### Slide 152: Welcome to Type-Level Programming
+### Slide 78: Welcome to Type-Level Programming
 
 Time for the final boss: **TypeScript Type Challenges**! These problems test your ability to write types that compute, transform, and validate at compile time.
 
@@ -4009,7 +4897,7 @@ We'll cover 9 levels of increasing difficulty:
 
 ---
 
-### Slide 153: Level 1 - Basics (keyof, typeof, indexed access)
+### Slide 78: Level 1 - Basics (keyof, typeof, indexed access)
 
 Let's start with the fundamentals that everything else builds on!
 
@@ -4029,7 +4917,7 @@ type B = Length<[]> // 0
 
 ---
 
-### Slide 154: Basics - First of Array & Tuple to Union
+### Slide 78: Basics - First of Array & Tuple to Union
 
 **Problem 1.2: First of Array**
 
@@ -4055,7 +4943,7 @@ These three patterns are foundational - you'll use `T['length']`, `T[0]`, and `T
 
 ---
 
-### Slide 155: Level 2 - Mapped Types
+### Slide 78: Level 2 - Mapped Types
 
 Mapped types let you transform object types by iterating over keys:
 
@@ -4085,7 +4973,7 @@ type MyReadonly<T> = {
 
 ---
 
-### Slide 156: Mapped Types - Modifiers and Key Manipulation
+### Slide 78: Mapped Types - Modifiers and Key Manipulation
 
 **Problem 2.3: Mutable** - Remove readonly:
 
@@ -4117,7 +5005,7 @@ type Merge<A, B> = {
 
 ---
 
-### Slide 157: Level 3 - Conditional Types
+### Slide 78: Level 3 - Conditional Types
 
 The `extends` keyword is your `if` statement at the type level:
 
@@ -4146,7 +5034,7 @@ The magic: when `T` is a union, the conditional **distributes** over each member
 
 ---
 
-### Slide 158: Conditional Types - IsNever and AnyOf
+### Slide 78: Conditional Types - IsNever and AnyOf
 
 **Problem 3.3: IsNever** - Check if a type is `never`:
 
@@ -4172,7 +5060,7 @@ type AnyOf<T extends any[]> = T[number] extends Falsy ? false : true
 
 ---
 
-### Slide 159: Level 4 - Infer (Pattern Matching)
+### Slide 78: Level 4 - Infer (Pattern Matching)
 
 The `infer` keyword lets you **extract** types from patterns:
 
@@ -4199,7 +5087,7 @@ type Result = MyParameters<(a: string, b: number) => void>
 
 ---
 
-### Slide 160: Infer - Array Manipulation
+### Slide 78: Infer - Array Manipulation
 
 **Problem 4.3: Awaited** - Unwrap Promises recursively:
 
@@ -4229,7 +5117,7 @@ Notice the pattern: `[...infer Rest, X]` matches "everything but the last"!
 
 ---
 
-### Slide 161: Level 5 - Template Literal Types
+### Slide 78: Level 5 - Template Literal Types
 
 TypeScript can manipulate strings at the type level!
 
@@ -4257,7 +5145,7 @@ type Result = TrimLeft<'   hello'> // 'hello'
 
 ---
 
-### Slide 162: Template Literals - KebabCase
+### Slide 78: Template Literals - KebabCase
 
 **Problem 5.5: KebabCase** - Convert `FooBarBaz` to `foo-bar-baz`:
 
@@ -4281,7 +5169,7 @@ type Result = KebabCase<'FooBarBaz'> // 'foo-bar-baz'
 
 ---
 
-### Slide 163: Template Literals - String to Union & Length
+### Slide 78: Template Literals - String to Union & Length
 
 **Problem 5.6: String to Union**
 
@@ -4309,7 +5197,7 @@ type Result = LengthOfString<'hello'> // 5
 
 ---
 
-### Slide 164: Level 6 - Recursive Types
+### Slide 78: Level 6 - Recursive Types
 
 Types can call themselves! Just like recursive functions:
 
@@ -4341,7 +5229,7 @@ type Result = Flatten<[1, [2, [3, 4]], 5]> // [1, 2, 3, 4, 5]
 
 ---
 
-### Slide 165: Recursive Types - Reverse and Fibonacci
+### Slide 78: Recursive Types - Reverse and Fibonacci
 
 **Problem 6.3: Reverse**
 
@@ -4370,7 +5258,7 @@ We use tuple lengths as numbers since TypeScript doesn't have type-level arithme
 
 ---
 
-### Slide 166: Level 7 - Distributive Conditionals
+### Slide 78: Level 7 - Distributive Conditionals
 
 When a conditional type receives a union, it **distributes**:
 
@@ -4401,7 +5289,7 @@ type B = IsUnion<string> // false
 
 ---
 
-### Slide 167: Distributive - Permutation
+### Slide 78: Distributive - Permutation
 
 **Problem 7.2: Permutation** - Generate all permutations of a union:
 
@@ -4427,7 +5315,7 @@ This is one of the trickiest type challenges!
 
 ---
 
-### Slide 168: Level 8 - Advanced Patterns
+### Slide 78: Level 8 - Advanced Patterns
 
 Key remapping and type arithmetic!
 
@@ -4454,7 +5342,7 @@ type OmitByType<T, U> = {
 
 ---
 
-### Slide 169: Advanced - PartialByKeys and Chunk
+### Slide 78: Advanced - PartialByKeys and Chunk
 
 **Problem 8.3: PartialByKeys** - Make only specific keys optional:
 
@@ -4486,7 +5374,7 @@ type Result = Chunk<[1, 2, 3, 4, 5], 2> // [[1,2], [3,4], [5]]
 
 ---
 
-### Slide 170: Level 9 - Expert Techniques
+### Slide 78: Level 9 - Expert Techniques
 
 The final boss level! Contravariance and type tricks.
 
@@ -4518,7 +5406,7 @@ type IsAny<T> = 0 extends 1 & T ? true : false
 
 ---
 
-### Slide 171: Expert - Greater Than
+### Slide 78: Expert - Greater Than
 
 **Problem 9.3: GreaterThan** - Compare numbers at type level:
 
@@ -4540,7 +5428,7 @@ type Result = GreaterThan<5, 3> // true
 
 ---
 
-### Slide 172: TypeScript Challenges - Cheat Sheet
+### Slide 78: TypeScript Challenges - Cheat Sheet
 
 Here are the essential patterns to memorize:
 
@@ -4570,7 +5458,7 @@ S extends `${infer C}${infer R}` ? [C, ...Iterate<R>] : []
 
 ---
 
-### Slide 173: Part 4 Wrap-Up
+### Slide 78: Part 4 Wrap-Up
 
 You've conquered the TypeScript Type System! Here's what you've learned:
 
@@ -4590,7 +5478,7 @@ You've conquered the TypeScript Type System! Here's what you've learned:
 
 ---
 
-### Slide 174: Final Thoughts
+### Slide 78: Final Thoughts
 
 You've completed the Frontend Interview Preparation Workshop! Here's what to remember:
 

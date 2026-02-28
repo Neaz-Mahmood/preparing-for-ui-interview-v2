@@ -1,15 +1,10 @@
 /**
- * Randomizes an array in place using the Fisher-Yates shuffle algorithm.
- * @param arr The array to randomize.
- * @param size The dimension size (used for calculation, though not directly in the shuffle logic as written).
- * @returns The randomized array.
+ * Shuffles an array using sort with a random comparator.
+ * @param arr The array to shuffle.
+ * @returns The shuffled array.
  */
-export function randomizeArray(arr: Array<number | null>): Array<number | null> {
-  for (let i = 0; i < arr.length; i++) {
-    const newIndex = Math.floor(Math.random() * arr.length)
-    ;[arr[i], arr[newIndex]] = [arr[newIndex], arr[i]]
-  }
-  return arr
+function randomizeArray(arr: Array<number | null>): Array<number | null> {
+  return arr.sort(() => Math.random() - 0.5)
 }
 
 /**
@@ -24,17 +19,20 @@ function chunkify(arr: Array<number | null>, n: number): Array<Array<number | nu
 
 /**
  * Generates the initial game state for the square game.
- * Creates a sorted array, randomizes it, and converts it to a 2D grid.
+ * Creates a sorted array, shuffles it, and converts it to a 2D grid.
  * @param size The size of the grid (e.g., 3 for a 3x3 grid).
  * @returns A 2D array representing the game board.
  */
 export function getGameState(size: number): Array<Array<number | null>> {
-  let arr = Array(size * size)
-    .fill(null)
-    .map((_, i) => (i === size * size - 1 ? null : i + 1))
-  arr = randomizeArray(arr)
+  const arr = randomizeArray(
+    Array(size * size)
+      .fill(null)
+      .map((_, i) => (i === size * size - 1 ? null : i + 1))
+  )
   return chunkify(arr, size)
 }
+
+type TPosition = [row: number, col: number]
 
 /**
  * Validates if a move is legal.
@@ -43,7 +41,7 @@ export function getGameState(size: number): Array<Array<number | null>> {
  * @param param1 [emptyRow, emptyCol] coordinates of the empty cell.
  * @returns True if the move is valid, false otherwise.
  */
-export function validate([row, col]: [number, number], [emptyRow, emptyCol]: [number, number]) {
+export function validate([row, col]: TPosition, [emptyRow, emptyCol]: TPosition) {
   const validHorizontally = row === emptyRow && (col === emptyCol + 1 || col === emptyCol - 1)
   const validVertically = col === emptyCol && (row === emptyRow + 1 || row === emptyRow - 1)
   return validHorizontally || validVertically
@@ -54,7 +52,7 @@ export function validate([row, col]: [number, number], [emptyRow, emptyCol]: [nu
  * @param arr The 2D game grid.
  * @returns [row, col] of the empty cell.
  */
-export function getEmptyPosition(arr: Array<Array<number | null>>): [number, number] {
+export function getEmptyPosition(arr: Array<Array<number | null>>): TPosition {
   for (let row = 0; row < arr.length; row++) {
     for (let col = 0; col < arr[0].length; col++) {
       if (arr[row][col] === null) {
@@ -67,10 +65,11 @@ export function getEmptyPosition(arr: Array<Array<number | null>>): [number, num
 
 /**
  * Checks if the game is won.
- * The game is won if the flattened array matches the sequence "12345678null".
+ * The game is won if tiles are in order 1..n with null at the end.
  * @param arr The 2D game grid.
  * @returns True if the game is won.
  */
 export function isWin(arr: Array<Array<number | null>>): boolean {
-  return arr.flat(Infinity).join('') === '12345678null'
+  const flat = arr.flat()
+  return flat.every((val, i) => i === flat.length - 1 ? val === null : val === i + 1)
 }

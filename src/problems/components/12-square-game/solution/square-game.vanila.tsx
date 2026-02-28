@@ -1,17 +1,21 @@
 import { AbstractComponent } from '../../00-abstract-component/component'
 import { getEmptyPosition, getGameState, isWin, validate } from './square-game.utility'
 import css from './square-game.module.css'
+import flex from '@course/styles'
+import cx from '@course/cx'
 
 const GAME_SIZE = 3
 
-export type TSquareGameProps = {}
+export type TSquareGameProps = {
+  initState?: Array<Array<number | null>>
+}
 
 export class GameOfThree extends AbstractComponent<TSquareGameProps> {
   state: Array<Array<number | null>>
 
-  constructor(config: { root: HTMLElement }) {
+  constructor(config: { root: HTMLElement } & TSquareGameProps) {
     super({ ...config, listeners: ['click'] })
-    this.state = getGameState(GAME_SIZE)
+    this.state = config.initState ?? getGameState(GAME_SIZE)
   }
 
   toHTML() {
@@ -20,9 +24,10 @@ export class GameOfThree extends AbstractComponent<TSquareGameProps> {
         return row
           .map((col, colIndex) => {
             const cellClass = col === null ? css.cell__empty : css.cell__filled
+            const bgClass = col === null ? flex.bgWhite5 : flex.bgBlack10
             return `
                         <div 
-                            class="${css.cell} ${cellClass}"
+                            class="${cx(css.cell, flex.flexRowCenter, flex.cWhite10, cellClass, bgClass)}"
                             data-row="${rowIndex}" 
                             data-col="${colIndex}"
                         >
@@ -34,9 +39,9 @@ export class GameOfThree extends AbstractComponent<TSquareGameProps> {
       .join('')
 
     return `
-            <section class="${css.container}">
+            <section class="${cx(flex.flexColumnCenter, flex.flexGap16)}">
                 <div>Game status: ${isWin(this.state) ? 'win' : 'not yet'}</div>
-                <div class="${css.board}">
+                <div class="${cx(css.board, flex.bgBlack8)}">
                     ${cells}
                 </div>
             </section>
@@ -45,20 +50,15 @@ export class GameOfThree extends AbstractComponent<TSquareGameProps> {
 
   onClick(e: Event) {
     const target = e.target as HTMLElement
-    const rowStr = target.dataset.row
-    const colStr = target.dataset.col
-
-    if (rowStr === undefined || colStr === undefined) return
-
-    const row = parseInt(rowStr, 10)
-    const col = parseInt(colStr, 10)
+    const row = Number(target.dataset.row)
+    const col = Number(target.dataset.col)
 
     if (isNaN(row) || isNaN(col)) return
 
     const [emptyRow, emptyCol] = getEmptyPosition(this.state)
     if (validate([row, col], [emptyRow, emptyCol])) {
-      const newState = this.state.map((r) => [...r])
-      ;[newState[row][col], newState[emptyRow][emptyCol]] = [
+      const newState = structuredClone(this.state);
+      [newState[row][col], newState[emptyRow][emptyCol]] = [
         newState[emptyRow][emptyCol],
         newState[row][col],
       ]

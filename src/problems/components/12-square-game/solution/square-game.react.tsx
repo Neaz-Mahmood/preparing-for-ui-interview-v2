@@ -6,8 +6,12 @@ import { getEmptyPosition, getGameState, isWin, validate } from './square-game.u
 
 const GAME_SIZE = 3
 
-export const SquareGame = () => {
-  const [state, setState] = useState(getGameState(GAME_SIZE))
+type TSquareGameProps = {
+  initState?: Array<Array<number | null>>
+}
+
+export const SquareGame = ({ initState }: TSquareGameProps = {}) => {
+  const [state, setState] = useState(initState ?? getGameState(GAME_SIZE))
 
   const handleCellClick: React.MouseEventHandler = ({ target }) => {
     if (!(target instanceof HTMLElement)) {
@@ -19,8 +23,8 @@ export const SquareGame = () => {
     }
     const [emptyRow, emptyCol] = getEmptyPosition(state)
     if (validate([rowIndex, colIndex], [emptyRow, emptyCol])) {
-      const newState = state.map((row) => [...row])
-      ;[newState[rowIndex][colIndex], newState[emptyRow][emptyCol]] = [
+      const newState = structuredClone(state);
+      [newState[rowIndex][colIndex], newState[emptyRow][emptyCol]] = [
         newState[emptyRow][emptyCol],
         newState[rowIndex][colIndex],
       ]
@@ -31,7 +35,7 @@ export const SquareGame = () => {
   return (
     <section className={cx(flex.flexColumnCenter, flex.flexGap16)}>
       <div>Game status: {isWin(state) ? 'win' : 'not yet'}</div>
-      <div onClickCapture={handleCellClick} className={cx(styles.board)}>
+      <div onClickCapture={handleCellClick} className={cx(styles.board, flex.bgBlack8)}>
         {state.map((row, rowIndex) => (
           <>
             {row.map((col, colIndex) => (
@@ -40,7 +44,9 @@ export const SquareGame = () => {
                 className={cx(
                   styles.cell,
                   flex.flexRowCenter,
+                  flex.cWhite10,
                   col == null ? styles.cell__empty : styles.cell__filled,
+                  col == null ? flex.bgWhite5 : flex.bgBlack10,
                 )}
                 data-row={rowIndex}
                 data-col={colIndex}
