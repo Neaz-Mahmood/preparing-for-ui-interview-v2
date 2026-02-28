@@ -64,3 +64,9 @@ The built-in `typeof` operator has limitations:
 2. Use `Object.getPrototypeOf(value)` to get the prototype
 3. Access `.constructor.name` and lowercase it
 4. Use nullish coalescing (`??`) to handle objects with null prototype
+
+## Run Tests
+
+```bash
+bun test src/problems/vanila/01-detect-type/test/detect-type.test.ts
+```
