@@ -5,6 +5,7 @@ type TTooltipProps = {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'auto'
   children: HTMLElement
   content: string
+  boundary?: HTMLElement
 }
 
 const positions = {
@@ -14,44 +15,34 @@ const positions = {
   right: css.right,
 } as const
 
+const OFFSET = 8 // 0.5rem
+
 let id = 0
 
-function getAutoPosition(tooltip: HTMLElement, container: HTMLElement) {
-  const [tooltipRect, containerRect] = [
-    tooltip.getBoundingClientRect(),
-    container.getBoundingClientRect(),
+type TCandidate = { position: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number }
+
+function getAutoPosition(
+  tooltip: HTMLElement,
+  container: HTMLElement,
+  boundaryRect: { left: number; top: number; right: number; bottom: number },
+) {
+  const t = tooltip.getBoundingClientRect()
+  const c = container.getBoundingClientRect()
+
+  const fits = (x: number, y: number) =>
+    x >= boundaryRect.left &&
+    y >= boundaryRect.top &&
+    Math.ceil(x + t.width) <= boundaryRect.right &&
+    Math.ceil(y + t.height) <= boundaryRect.bottom
+
+  const candidates: TCandidate[] = [
+    { position: 'top', x: c.left + c.width / 2 - t.width / 2, y: c.top - t.height - OFFSET },
+    { position: 'right', x: c.right + OFFSET, y: c.top + c.height / 2 - t.height / 2 },
+    { position: 'bottom', x: c.left + c.width / 2 - t.width / 2, y: c.bottom + OFFSET },
+    { position: 'left', x: c.left - t.width - OFFSET, y: c.top + c.height / 2 - t.height / 2 },
   ]
-  const [viewportWidth, viewportHeight] = [window.innerWidth, window.innerHeight]
 
-  const topY = containerRect.top - tooltipRect.height
-  const topX = containerRect.left + containerRect.width / 2 - tooltipRect.width / 2
-
-  if (topX >= 0 && topY >= 0 && topX + tooltipRect.width <= viewportWidth) {
-    return 'top'
-  }
-
-  const rightX = containerRect.right + tooltipRect.width
-  const rightY = containerRect.top + containerRect.height / 2 - tooltipRect.height / 2
-
-  if (rightX <= viewportWidth && rightY >= 0 && rightY + tooltipRect.height <= viewportHeight) {
-    return 'right'
-  }
-
-  const leftX = containerRect.left - tooltipRect.width
-  const leftY = containerRect.top + containerRect.height / 2 - tooltipRect.height / 2
-
-  if (leftX >= 0 && leftY >= 0 && leftY + tooltipRect.height <= viewportHeight) {
-    return 'left'
-  }
-
-  const bottomY = containerRect.bottom + tooltipRect.height
-  const bottomX = containerRect.left + containerRect.width / 2 - tooltipRect.width / 2
-
-  if (bottomY <= viewportHeight && bottomX >= 0 && bottomX + tooltipRect.width <= viewportWidth) {
-    return 'bottom'
-  }
-
-  return 'top'
+  return candidates.find(({ x, y }) => fits(x, y))?.position ?? 'top'
 }
 
 export class Tooltip extends AbstractComponent<TTooltipProps> {
@@ -101,7 +92,12 @@ export class Tooltip extends AbstractComponent<TTooltipProps> {
   showTooltip() {
     this.tooltipElement!.style.display = 'block'
     if (this.config.position === 'auto') {
-      const position = positions[getAutoPosition(this.tooltipElement!, this.container!)]
+      const boundaryRect = this.config.boundary
+        ? this.config.boundary.getBoundingClientRect()
+        : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
+
+      const position =
+        positions[getAutoPosition(this.tooltipElement!, this.container!, boundaryRect)]
       for (const classname of Object.values(positions)) {
         this.tooltipElement!.classList.remove(classname)
       }

@@ -10,6 +10,7 @@
   background-color: #faf6c3;
   opacity: 0;
   transition: opacity 0.3s ease-in-out;
+  white-space: nowrap;
 }
 
 .top,
@@ -21,20 +22,24 @@
 
 .top {
   top: 0;
-  transform: translateY(calc(-100% - 0.5rem));
+  left: 50%;
+  transform: translate(-50%, calc(-100% - 0.5rem));
 }
 
 .bottom {
   bottom: 0;
-  transform: translateY(calc(100% + 0.5rem));
+  left: 50%;
+  transform: translate(-50%, calc(100% + 0.5rem));
 }
 
 .left {
+  top: 50%;
   left: 0;
-  transform: translate(calc(-100% - 0.5rem), -100%);
+  transform: translate(calc(-100% - 0.5rem), -50%);
 }
 
 .right {
-  right: 0;
-  transform: translate(calc(100% + 0.5rem), -100%);
+  top: 50%;
+  left: 100%;
+  transform: translate(0.5rem, -50%);
 }

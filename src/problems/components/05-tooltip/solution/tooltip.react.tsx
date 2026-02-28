@@ -6,6 +6,7 @@ type TooltipProps = {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'auto'
   children: React.ReactNode
   content: React.ReactNode
+  boundary?: React.RefObject<HTMLElement | null> | HTMLElement
 }
 
 const positions = {
@@ -17,56 +18,33 @@ const positions = {
 
 const OFFSET = 8 // 0.5rem
 
+type TCandidate = { position: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number }
+
 const getAutoPosition = (
   tooltipRect: DOMRect,
   triggerRect: DOMRect,
-  windowWidth: number,
-  windowHeight: number,
+  boundaryRect: { left: number; top: number; right: number; bottom: number },
 ): 'top' | 'bottom' | 'left' | 'right' => {
-  const tooltipWidth = tooltipRect.width
-  const tooltipHeight = tooltipRect.height
+  const { width: tw, height: th } = tooltipRect
+  const { left: trL, top: trT, width: trW, height: trH, right: trR, bottom: trB } = triggerRect
 
-  // 1. Try Top
-  const topY = triggerRect.top - tooltipHeight - OFFSET
-  const topX = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2
-  if (topY >= 0 && topX >= 0 && topX + tooltipWidth <= windowWidth) {
-    return 'top'
-  }
+  const fits = (x: number, y: number) =>
+    x >= boundaryRect.left &&
+    y >= boundaryRect.top &&
+    Math.ceil(x + tw) <= boundaryRect.right &&
+    Math.ceil(y + th) <= boundaryRect.bottom
 
-  // 2. Try Right
-  const rightX = triggerRect.right + OFFSET
-  const rightY = triggerRect.top + triggerRect.height / 2 - tooltipHeight / 2
-  if (
-    rightX + tooltipWidth <= windowWidth &&
-    rightY >= 0 &&
-    rightY + tooltipHeight <= windowHeight
-  ) {
-    return 'right'
-  }
+  const candidates: TCandidate[] = [
+    { position: 'top', x: trL + trW / 2 - tw / 2, y: trT - th - OFFSET },
+    { position: 'right', x: trR + OFFSET, y: trT + trH / 2 - th / 2 },
+    { position: 'bottom', x: trL + trW / 2 - tw / 2, y: trB + OFFSET },
+    { position: 'left', x: trL - tw - OFFSET, y: trT + trH / 2 - th / 2 },
+  ]
 
-  // 3. Try Left
-  const leftX = triggerRect.left - tooltipWidth - OFFSET
-  const leftY = triggerRect.top + triggerRect.height / 2 - tooltipHeight / 2
-  if (leftX >= 0 && leftY >= 0 && leftY + tooltipHeight <= windowHeight) {
-    return 'left'
-  }
-
-  // 4. Try Bottom
-  const bottomY = triggerRect.bottom + OFFSET
-  const bottomX = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2
-  if (
-    bottomY + tooltipHeight <= windowHeight &&
-    bottomX >= 0 &&
-    bottomX + tooltipWidth <= windowWidth
-  ) {
-    return 'bottom'
-  }
-
-  // Fallback
-  return 'top'
+  return candidates.find(({ x, y }) => fits(x, y))?.position ?? 'top'
 }
 
-export function Tooltip({ children, content, position = 'top' }: TooltipProps) {
+export function Tooltip({ children, content, position = 'top', boundary }: TooltipProps) {
   const [isVisible, setIsVisible] = React.useState(false)
   const [tooltipPosition, setTooltipPosition] = React.useState<'top' | 'bottom' | 'left' | 'right'>(
     position === 'auto' ? 'top' : position,
@@ -79,18 +57,18 @@ export function Tooltip({ children, content, position = 'top' }: TooltipProps) {
       const tooltipRect = tooltipRef.current.getBoundingClientRect()
       const triggerRect = containerRef.current.getBoundingClientRect()
 
-      const newPosition = getAutoPosition(
-        tooltipRect,
-        triggerRect,
-        window.innerWidth,
-        window.innerHeight,
-      )
+      const boundaryElement = boundary instanceof HTMLElement ? boundary : boundary?.current
+      const boundaryRect = boundaryElement
+        ? boundaryElement.getBoundingClientRect()
+        : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
+
+      const newPosition = getAutoPosition(tooltipRect, triggerRect, boundaryRect)
 
       if (newPosition !== tooltipPosition) {
         setTooltipPosition(newPosition)
       }
     }
-  }, [isVisible, position, tooltipPosition])
+  }, [isVisible, position, tooltipPosition, boundary])
 
   const tooltipId = React.useId()
 
