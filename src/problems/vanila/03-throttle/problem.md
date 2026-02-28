@@ -38,3 +38,9 @@ log('d') // Logs 'd'
 1. Track the timestamp of the last execution
 2. Use `Date.now()` to check elapsed time
 3. Only execute if enough time has passed
+
+## Run Tests
+
+```bash
+bun test src/problems/vanila/03-throttle/test/throttle.test.ts
+```
