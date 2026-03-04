@@ -6,283 +6,162 @@ import {
   ToastVanillaExample,
   ToastStudentExample,
   ToastStudentVanillaExample,
-} from './problems/components/10-toast/toast.example'
-import './problems/components/10-toast/solution/toast.animations.css' // Global keyframes
+} from './problems/38-toast/toast.example'
+import './problems/38-toast/solution/toast.animations.css' // Global keyframes
 
 import {
   CheckboxTreeExample,
   CheckboxTreeVanillaExample,
   CheckboxesStudentExample,
   CheckboxesStudentVanillaExample,
-} from './problems/components/09-nested-checkboxes/checkboxes.example'
+} from './problems/37-nested-checkboxes/checkboxes.example'
 import {
   AccordionExample,
   AccordionVanillaExample,
   AccordionStudentExample,
   AccordionStudentVanillaExample,
-} from './problems/components/01-accordion/accordion.example'
+} from './problems/21-accordion/accordion.example'
 import {
   TabsExample,
   TabsVanillaExample,
   TabsStudentExample,
   TabsStudentVanillaExample, // Verified export exists
-} from './problems/components/03-tabs/tabs.example'
+} from './problems/25-tabs/tabs.example'
 import {
   TooltipExample,
   TooltipVanillaExample,
   TooltipStudentExample,
-} from './problems/components/05-tooltip/tooltip.example'
+} from './problems/29-tooltip/tooltip.example'
 import {
   TableExample,
   TableVanillaExample,
   TableStudentExample,
   TableStudentVanillaExample, // Verified export exists
-} from './problems/components/06-table/table.example'
+} from './problems/30-table/table.example'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import {
-  MarkdownExample,
-  MarkdownStudentExample,
-} from './problems/components/17-markdown/markdown.example'
+import { MarkdownExample, MarkdownStudentExample } from './problems/55-markdown/markdown.example'
 import {
   ProgressBarExample,
   ProgressBarVanillaExample,
   ProgressBarStudentExample,
   ProgressBarStudentVanillaExample,
-} from './problems/components/14-progress-bar/progress-bar.example'
+} from './problems/46-progress-bar/progress-bar.example'
 import {
   SquareGameExample,
   SquareGameVanillaExample,
   SquareGameStudentExample,
-} from './problems/components/12-square-game/square-game.example'
-import { UseFileUploadExample } from './problems/components/15.1-use-file-upload/use-file-upload.example'
+} from './problems/42-square-game/square-game.example'
+import { UseFileUploadExample } from './problems/49-use-file-upload/use-file-upload.example'
 import {
   UploadComponentExample,
   UploadComponentStudentExample,
-} from './problems/components/15.2-upload-component/upload-component.example'
+} from './problems/50-upload-component/upload-component.example'
 
 import {
   GalleryExample,
   GalleryVanillaExample,
   GalleryStudentExample,
   GalleryStudentVanillaExample,
-} from './problems/components/08-gallery/gallery.example'
+} from './problems/34-gallery/gallery.example'
 import {
   GPTComponentExample,
   GPTChatVanillaExample,
   GptChatStudentExample,
   GptChatStudentVanillaExample,
-} from './problems/components/18-gpt-chat/gpt-chat.example'
+} from './problems/56-gpt-chat/gpt-chat.example'
 
 import {
   RedditThreadExample,
   RedditThreadVanillaExample,
   RedditThreadStudentExample,
   RedditThreadStudentVanillaExample,
-} from './problems/components/07-reddit-thread/reddit-thread.example'
+} from './problems/33-reddit-thread/reddit-thread.example'
 import {
   StarRatingExample,
   StarRatingVanillaExample,
   StarRatingStudentExample,
-} from './problems/components/02-star-rating/star-rating.example'
+} from './problems/22-star-rating/star-rating.example'
 import {
   CalculatorExample,
   CalculatorVanillaExample,
   CalculatorStudentExample,
   CalculatorStudentVanillaExample,
-} from './problems/components/11-calculator/calculator.example'
+} from './problems/41-calculator/calculator.example'
 import {
   TypeaheadExample,
   TypeaheadVanillaExample,
   TypeaheadStudentExample,
-} from './problems/components/13-typeahead/typeahead.example'
+} from './problems/45-typeahead/typeahead.example'
 import {
   DialogExample,
   DialogVanillaExample,
   DialogStudentExample,
-} from './problems/components/04-dialog/dialog.example'
+} from './problems/26-dialog/dialog.example'
 import {
   PortfolioVisualizerExample as PortfolioVisualizerUxExample,
   PortfolioVisualizerVanillaExample as PortfolioVisualizerUxVanillaExample,
   PortfolioVisualizerStudentExample as PortfolioVisualizerUxStudentExample,
   PortfolioVisualizerStudentVanillaExample as PortfolioVisualizerUxStudentVanillaExample,
-} from './problems/components/16.1-portfolio-visualizer-ux/portfolio-visualizer.example'
+} from './problems/53-portfolio-visualizer-ux/portfolio-visualizer.example'
 import {
   PortfolioVisualizerExample as PortfolioVisualizerLogicExample,
   PortfolioVisualizerVanillaExample as PortfolioVisualizerLogicVanillaExample,
   PortfolioVisualizerStudentExample as PortfolioVisualizerLogicStudentExample,
   PortfolioVisualizerStudentVanillaExample as PortfolioVisualizerLogicStudentVanillaExample,
-} from './problems/components/16.2-portfolio-visualizer-logic/portfolio-visualizer.example'
-import { TableEngineExample as BasicEngineExample } from './problems/components/19 - google sheet/19.1-google-sheet-basic/table-engine.example.tsx'
-import { TableEngineExample as CompileEngineExample } from './problems/components/19 - google sheet/19.2-google-sheet-compile/table-engine.example.tsx'
-import { TableEngineExample as TopoEngineExample } from './problems/components/19 - google sheet/19.3-google-sheet-topo/table-engine.example.tsx'
-import { TableEngineExample as EvalEngineExample } from './problems/components/19 - google sheet/19.4-google-sheet-eval/table-engine.example.tsx'
-import { TableEngineExample as RecomputeEngineExample } from './problems/components/19 - google sheet/19.5-google-sheet-recompute/table-engine.example.tsx'
+} from './problems/54-portfolio-visualizer-logic/portfolio-visualizer.example'
+import { TableEngineExample as BasicEngineExample } from './problems/57-google-sheet-basic/table-engine.example.tsx'
+import { TableEngineExample as CompileEngineExample } from './problems/58-google-sheet-compile/table-engine.example.tsx'
+import { TableEngineExample as TopoEngineExample } from './problems/59-google-sheet-topo/table-engine.example.tsx'
+import { TableEngineExample as EvalEngineExample } from './problems/60-google-sheet-eval/table-engine.example.tsx'
+import { TableEngineExample as RecomputeEngineExample } from './problems/61-google-sheet-recompute/table-engine.example.tsx'
 import {
   GoogleSheetExample,
   GoogleSheetVanillaExample,
   GoogleSheetStudentExample,
   GoogleSheetStudentVanillaExample,
-} from './problems/components/19 - google sheet/19.6-google-sheet-ux/google-sheet.example.tsx'
+} from './problems/62-google-sheet-ux/google-sheet.example.tsx'
 
 // Import problem markdown files (Bun text imports)
-import toastProblem from './problems/components/10-toast/problem.md' with { type: 'text' }
-import checkboxProblem from './problems/components/09-nested-checkboxes/problem.md' with { type: 'text' }
-import accordionProblem from './problems/components/01-accordion/problem.md' with { type: 'text' }
-import tabsProblem from './problems/components/03-tabs/problem.md' with { type: 'text' }
-import tooltipProblem from './problems/components/05-tooltip/problem.md' with { type: 'text' }
-import dialogProblem from './problems/components/04-dialog/problem.md' with { type: 'text' }
-import tableProblem from './problems/components/06-table/problem.md' with { type: 'text' }
-import markdownProblem from './problems/components/17-markdown/problem.md' with { type: 'text' }
-import squareGameProblem from './problems/components/12-square-game/problem.md' with { type: 'text' }
-import progressBarProblem from './problems/components/14-progress-bar/problem.md' with { type: 'text' }
-import uploadComponentProblem from './problems/components/15.2-upload-component/problem.md' with { type: 'text' }
-import useFileUploadProblem from './problems/components/15.1-use-file-upload/problem.md' with { type: 'text' }
-import portfolioVisualizerUxProblem from './problems/components/16.1-portfolio-visualizer-ux/problem.md' with { type: 'text' }
-import portfolioVisualizerLogicProblem from './problems/components/16.2-portfolio-visualizer-logic/problem.md' with { type: 'text' }
-import tableEngineBasicProblem from './problems/components/19 - google sheet/19.1-google-sheet-basic/problem.md' with { type: 'text' }
-import tableEngineCompileProblem from './problems/components/19 - google sheet/19.2-google-sheet-compile/problem.md' with { type: 'text' }
-import tableEngineTopoProblem from './problems/components/19 - google sheet/19.3-google-sheet-topo/problem.md' with { type: 'text' }
-import tableEngineEvalProblem from './problems/components/19 - google sheet/19.4-google-sheet-eval/problem.md' with { type: 'text' }
-import tableEngineRecomputeProblem from './problems/components/19 - google sheet/19.5-google-sheet-recompute/problem.md' with { type: 'text' }
-import googleSheetProblem from './problems/components/19 - google sheet/19.6-google-sheet-ux/problem.md' with { type: 'text' }
+import toastProblem from './problems/38-toast/problem.md' with { type: 'text' }
+import checkboxProblem from './problems/37-nested-checkboxes/problem.md' with { type: 'text' }
+import accordionProblem from './problems/21-accordion/problem.md' with { type: 'text' }
+import tabsProblem from './problems/25-tabs/problem.md' with { type: 'text' }
+import tooltipProblem from './problems/29-tooltip/problem.md' with { type: 'text' }
+import dialogProblem from './problems/26-dialog/problem.md' with { type: 'text' }
+import tableProblem from './problems/30-table/problem.md' with { type: 'text' }
+import markdownProblem from './problems/55-markdown/problem.md' with { type: 'text' }
+import squareGameProblem from './problems/42-square-game/problem.md' with { type: 'text' }
+import progressBarProblem from './problems/46-progress-bar/problem.md' with { type: 'text' }
+import uploadComponentProblem from './problems/50-upload-component/problem.md' with { type: 'text' }
+import useFileUploadProblem from './problems/49-use-file-upload/problem.md' with { type: 'text' }
+import portfolioVisualizerUxProblem from './problems/53-portfolio-visualizer-ux/problem.md' with { type: 'text' }
+import portfolioVisualizerLogicProblem from './problems/54-portfolio-visualizer-logic/problem.md' with { type: 'text' }
+import tableEngineBasicProblem from './problems/57-google-sheet-basic/problem.md' with { type: 'text' }
+import tableEngineCompileProblem from './problems/58-google-sheet-compile/problem.md' with { type: 'text' }
+import tableEngineTopoProblem from './problems/59-google-sheet-topo/problem.md' with { type: 'text' }
+import tableEngineEvalProblem from './problems/60-google-sheet-eval/problem.md' with { type: 'text' }
+import tableEngineRecomputeProblem from './problems/61-google-sheet-recompute/problem.md' with { type: 'text' }
+import googleSheetProblem from './problems/62-google-sheet-ux/problem.md' with { type: 'text' }
 
-import galleryProblem from './problems/components/08-gallery/problem.md' with { type: 'text' }
-import gptChatProblem from './problems/components/18-gpt-chat/problem.md' with { type: 'text' }
+import galleryProblem from './problems/34-gallery/problem.md' with { type: 'text' }
+import gptChatProblem from './problems/56-gpt-chat/problem.md' with { type: 'text' }
 
-import redditThreadProblem from './problems/components/07-reddit-thread/problem.md' with { type: 'text' }
-import starRatingProblem from './problems/components/02-star-rating/problem.md' with { type: 'text' }
-import calculatorProblem from './problems/components/11-calculator/problem.md' with { type: 'text' }
-import typeaheadProblem from './problems/components/13-typeahead/problem.md' with { type: 'text' }
+import redditThreadProblem from './problems/33-reddit-thread/problem.md' with { type: 'text' }
+import starRatingProblem from './problems/22-star-rating/problem.md' with { type: 'text' }
+import calculatorProblem from './problems/41-calculator/problem.md' with { type: 'text' }
+import typeaheadProblem from './problems/45-typeahead/problem.md' with { type: 'text' }
 
 // Import vanilla JS problem markdown files
-import detectTypeProblem from './problems/vanila/01-detect-type/problem.md' with { type: 'text' }
-import debounceProblem from './problems/vanila/02-debounce/problem.md' with { type: 'text' }
-import throttleProblem from './problems/vanila/03-throttle/problem.md' with { type: 'text' }
-import es5ExtendsProblem from './problems/vanila/04-es5-extends/problem.md' with { type: 'text' }
-import deepEqualsProblem from './problems/vanila/05-deep-equals/problem.md' with { type: 'text' }
-import deepCloneProblem from './problems/vanila/06-deep-clone/problem.md' with { type: 'text' }
-import stringifyProblem from './problems/vanila/07-stringify/problem.md' with { type: 'text' }
-import promiseProblem from './problems/vanila/08-promise/problem.md' with { type: 'text' }
-import treeSelectProblem from './problems/vanila/09-tree-select/problem.md' with { type: 'text' }
-
-// TypeScript Imports
-import tsIndex from './problems/typescript/index.md' with { type: 'text' }
-
-// 01 Basics
-import tsBasicsIndex from './problems/typescript/01-basics/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTupleLength from './problems/typescript/01-basics/01-tuple-length.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsFirstOfArray from './problems/typescript/01-basics/02-first-of-array.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTupleToUnion from './problems/typescript/01-basics/03-tuple-to-union.ts' with { type: 'text' }
-
-// 02 Mapped Types
-import tsMappedIndex from './problems/typescript/02-mapped-types/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsPick from './problems/typescript/02-mapped-types/01-pick.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsReadonly from './problems/typescript/02-mapped-types/02-readonly.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsMutable from './problems/typescript/02-mapped-types/03-mutable.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTupleToObject from './problems/typescript/02-mapped-types/04-tuple-to-object.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsAppendToObject from './problems/typescript/02-mapped-types/05-append-to-object.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsMerge from './problems/typescript/02-mapped-types/06-merge.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsDiff from './problems/typescript/02-mapped-types/07-diff.ts' with { type: 'text' }
-
-// 03 Conditional Types
-import tsConditionalIndex from './problems/typescript/03-conditional-types/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsIf from './problems/typescript/03-conditional-types/01-if.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsExclude from './problems/typescript/03-conditional-types/02-exclude.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsIsNever from './problems/typescript/03-conditional-types/03-is-never.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsAnyOf from './problems/typescript/03-conditional-types/04-any-of.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsLookup from './problems/typescript/03-conditional-types/05-lookup.ts' with { type: 'text' }
-
-// 04 Infer
-import tsInferIndex from './problems/typescript/04-infer/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsReturnType from './problems/typescript/04-infer/01-return-type.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsParameters from './problems/typescript/04-infer/02-parameters.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsAwaited from './problems/typescript/04-infer/03-awaited.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsLast from './problems/typescript/04-infer/04-last.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsPop from './problems/typescript/04-infer/05-pop.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsFlatten from './problems/typescript/04-infer/06-flatten.ts' with { type: 'text' }
-
-// 05 Template Literals
-import tsTemplateIndex from './problems/typescript/05-template-literals/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsCapitalize from './problems/typescript/05-template-literals/01-capitalize.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTrimLeft from './problems/typescript/05-template-literals/02-trim-left.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTrim from './problems/typescript/05-template-literals/03-trim.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsReplace from './problems/typescript/05-template-literals/04-replace.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsKebabCase from './problems/typescript/05-template-literals/05-kebab-case.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsStringToUnion from './problems/typescript/05-template-literals/06-string-to-union.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsLength from './problems/typescript/05-template-literals/07-length-of-string.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsStartsEnds from './problems/typescript/05-template-literals/08-starts-ends-with.ts' with { type: 'text' }
-
-// 06 Recursive Types
-import tsRecursiveIndex from './problems/typescript/06-recursive-types/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsDeepReadonly from './problems/typescript/06-recursive-types/01-deep-readonly.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsReplaceAll from './problems/typescript/06-recursive-types/02-replace-all.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsReverse from './problems/typescript/06-recursive-types/03-reverse.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsFlattenDepth from './problems/typescript/06-recursive-types/04-flatten-depth.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsFibonacci from './problems/typescript/06-recursive-types/05-fibonacci.ts' with { type: 'text' }
-
-// 07 Distributive Conditionals
-import tsDistributiveIndex from './problems/typescript/07-distributive-conditionals/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsIsUnion from './problems/typescript/07-distributive-conditionals/01-is-union.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsPermutation from './problems/typescript/07-distributive-conditionals/02-permutation.ts' with { type: 'text' }
-
-// 08 Advanced Patterns
-import tsAdvancedIndex from './problems/typescript/08-advanced-patterns/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsPickByType from './problems/typescript/08-advanced-patterns/01-pick-by-type.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsOmitByType from './problems/typescript/08-advanced-patterns/02-omit-by-type.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsPartialByKeys from './problems/typescript/08-advanced-patterns/03-partial-by-keys.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsChunk from './problems/typescript/08-advanced-patterns/04-chunk.ts' with { type: 'text' }
-
-// 09 Expert Techniques
-import tsExpertIndex from './problems/typescript/09-expert-techniques/index.md' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsUnionToIntersection from './problems/typescript/09-expert-techniques/01-union-to-intersection.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsIsAny from './problems/typescript/09-expert-techniques/02-is-any.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsGreaterThan from './problems/typescript/09-expert-techniques/03-greater-than.ts' with { type: 'text' }
-// @ts-expect-error: No default export
-import tsTranspose from './problems/typescript/09-expert-techniques/04-transpose.ts' with { type: 'text' }
+import detectTypeProblem from './problems/01-detect-type/problem.md' with { type: 'text' }
+import debounceProblem from './problems/02-debounce/problem.md' with { type: 'text' }
+import throttleProblem from './problems/05-throttle/problem.md' with { type: 'text' }
+import es5ExtendsProblem from './problems/06-es5-extends/problem.md' with { type: 'text' }
+import deepEqualsProblem from './problems/09-deep-equals/problem.md' with { type: 'text' }
+import deepCloneProblem from './problems/10-deep-clone/problem.md' with { type: 'text' }
+import stringifyProblem from './problems/13-stringify/problem.md' with { type: 'text' }
+import promiseProblem from './problems/14-promise/problem.md' with { type: 'text' }
+import treeSelectProblem from './problems/17-tree-select/problem.md' with { type: 'text' }
 
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -322,8 +201,6 @@ const createProblemOverview = (markdownContent: string) => {
     </div>
   )
 }
-
-const createTsCode = (code: string) => `\`\`\`typescript\n${code}\n\`\`\``
 
 type TDifficulty = 'warm-up' | 'easy' | 'medium' | 'hard' | 'extreme'
 type TVariantType = 'overview' | 'react' | 'vanilla' | 'studentReact' | 'studentVanilla' | 'example'
@@ -708,390 +585,6 @@ const SECTIONS = {
       },
     } as Record<string, TProblem>,
   },
-  typescript: {
-    title: 'TypeScript Challenges',
-    items: {
-      overview: {
-        id: 'ts-overview',
-        name: 'Course Overview',
-        difficulty: 'warm-up',
-        variants: {
-          overview: { component: createProblemOverview(tsIndex) },
-        },
-      },
-    },
-  },
-  tsBasics: {
-    title: '1. Basics',
-    items: {
-      basicsOverview: {
-        id: 'ts-basics-overview',
-        name: 'Chapter Overview',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(tsBasicsIndex) } },
-      },
-      tupleLength: {
-        id: 'tuple-length',
-        name: 'Tuple Length',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTupleLength)) } },
-      },
-      firstOfArray: {
-        id: 'first-of-array',
-        name: 'First of Array',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsFirstOfArray)) } },
-      },
-      tupleToUnion: {
-        id: 'tuple-to-union',
-        name: 'Tuple to Union',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTupleToUnion)) } },
-      },
-    },
-  },
-  tsMappedTypes: {
-    title: '2. Mapped Types',
-    items: {
-      mappedIndex: {
-        id: 'ts-mapped-index',
-        name: 'Chapter Overview',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(tsMappedIndex) } },
-      },
-      pick: {
-        id: 'pick',
-        name: 'Pick',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsPick)) } },
-      },
-      readonly: {
-        id: 'readonly',
-        name: 'Readonly',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsReadonly)) } },
-      },
-      mutable: {
-        id: 'mutable',
-        name: 'Mutable',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsMutable)) } },
-      },
-      tupleToObject: {
-        id: 'tuple-to-object',
-        name: 'Tuple to Object',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTupleToObject)) } },
-      },
-      appendToObject: {
-        id: 'append-to-object',
-        name: 'Append to Object',
-        difficulty: 'medium',
-        variants: {
-          overview: { component: createProblemOverview(createTsCode(tsAppendToObject)) },
-        },
-      },
-      merge: {
-        id: 'merge',
-        name: 'Merge',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsMerge)) } },
-      },
-      diff: {
-        id: 'diff',
-        name: 'Diff',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsDiff)) } },
-      },
-    },
-  },
-  tsConditionalTypes: {
-    title: '3. Conditional Types',
-    items: {
-      conditionalIndex: {
-        id: 'ts-conditional-index',
-        name: 'Chapter Overview',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(tsConditionalIndex) } },
-      },
-      if: {
-        id: 'if',
-        name: 'If',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsIf)) } },
-      },
-      exclude: {
-        id: 'exclude',
-        name: 'Exclude',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsExclude)) } },
-      },
-      isNever: {
-        id: 'is-never',
-        name: 'IsNever',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsIsNever)) } },
-      },
-      anyOf: {
-        id: 'any-of',
-        name: 'AnyOf',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsAnyOf)) } },
-      },
-      lookup: {
-        id: 'lookup',
-        name: 'LookUp',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsLookup)) } },
-      },
-    },
-  },
-  tsInfer: {
-    title: '4. Infer',
-    items: {
-      inferIndex: {
-        id: 'ts-infer-index',
-        name: 'Chapter Overview',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(tsInferIndex) } },
-      },
-      returnType: {
-        id: 'return-type',
-        name: 'ReturnType',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsReturnType)) } },
-      },
-      parameters: {
-        id: 'parameters',
-        name: 'Parameters',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsParameters)) } },
-      },
-      awaited: {
-        id: 'awaited',
-        name: 'Awaited',
-        difficulty: 'easy',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsAwaited)) } },
-      },
-      last: {
-        id: 'last',
-        name: 'Last of Array',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsLast)) } },
-      },
-      pop: {
-        id: 'pop',
-        name: 'Pop',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsPop)) } },
-      },
-      flatten: {
-        id: 'flatten',
-        name: 'Flatten',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsFlatten)) } },
-      },
-    },
-  },
-  tsTemplateLiterals: {
-    title: '5. Template Literals',
-    items: {
-      templateIndex: {
-        id: 'ts-template-index',
-        name: 'Chapter Overview',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(tsTemplateIndex) } },
-      },
-      capitalize: {
-        id: 'capitalize',
-        name: 'Capitalize',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsCapitalize)) } },
-      },
-      trimLeft: {
-        id: 'trim-left',
-        name: 'Trim Left',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTrimLeft)) } },
-      },
-      trim: {
-        id: 'trim',
-        name: 'Trim',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTrim)) } },
-      },
-      replace: {
-        id: 'replace',
-        name: 'Replace',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsReplace)) } },
-      },
-      kebabCase: {
-        id: 'kebab-case',
-        name: 'Kebab Case',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsKebabCase)) } },
-      },
-      stringToUnion: {
-        id: 'string-to-union',
-        name: 'String to Union',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsStringToUnion)) } },
-      },
-      length: {
-        id: 'length-of-string',
-        name: 'Length of String',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsLength)) } },
-      },
-      startsEnds: {
-        id: 'starts-ends-with',
-        name: 'Starts/Ends With',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsStartsEnds)) } },
-      },
-    },
-  },
-  tsRecursiveTypes: {
-    title: '6. Recursive Types',
-    items: {
-      recursiveIndex: {
-        id: 'ts-recursive-index',
-        name: 'Chapter Overview',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(tsRecursiveIndex) } },
-      },
-      deepReadonly: {
-        id: 'deep-readonly',
-        name: 'Deep Readonly',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsDeepReadonly)) } },
-      },
-      replaceAll: {
-        id: 'replace-all',
-        name: 'Replace All',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsReplaceAll)) } },
-      },
-      reverse: {
-        id: 'reverse',
-        name: 'Reverse',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsReverse)) } },
-      },
-      flattenDepth: {
-        id: 'flatten-depth',
-        name: 'Flatten Depth',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsFlattenDepth)) } },
-      },
-      fibonacci: {
-        id: 'fibonacci',
-        name: 'Fibonacci',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsFibonacci)) } },
-      },
-    },
-  },
-  tsDistributive: {
-    title: '7. Distributive Conditionals',
-    items: {
-      distributiveIndex: {
-        id: 'ts-distributive-index',
-        name: 'Chapter Overview',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(tsDistributiveIndex) } },
-      },
-      isUnion: {
-        id: 'is-union',
-        name: 'IsUnion',
-        difficulty: 'medium',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsIsUnion)) } },
-      },
-      permutation: {
-        id: 'permutation',
-        name: 'Permutation',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsPermutation)) } },
-      },
-    },
-  },
-  tsAdvancedPatterns: {
-    title: '8. Advanced Patterns',
-    items: {
-      advancedIndex: {
-        id: 'ts-advanced-index',
-        name: 'Chapter Overview',
-        difficulty: 'extreme',
-        variants: { overview: { component: createProblemOverview(tsAdvancedIndex) } },
-      },
-      pickByType: {
-        id: 'pick-by-type',
-        name: 'PickByType',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsPickByType)) } },
-      },
-      omitByType: {
-        id: 'omit-by-type',
-        name: 'OmitByType',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsOmitByType)) } },
-      },
-      partialByKeys: {
-        id: 'partial-by-keys',
-        name: 'PartialByKeys',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsPartialByKeys)) } },
-      },
-      chunk: {
-        id: 'chunk',
-        name: 'Chunk',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsChunk)) } },
-      },
-    },
-  },
-  tsExpertTechniques: {
-    title: '9. Expert Techniques',
-    items: {
-      expertIndex: {
-        id: 'ts-expert-index',
-        name: 'Chapter Overview',
-        difficulty: 'extreme',
-        variants: { overview: { component: createProblemOverview(tsExpertIndex) } },
-      },
-      unionToIntersection: {
-        id: 'union-to-intersection',
-        name: 'Union To Intersection',
-        difficulty: 'hard',
-        variants: {
-          overview: { component: createProblemOverview(createTsCode(tsUnionToIntersection)) },
-        },
-      },
-      isAny: {
-        id: 'is-any',
-        name: 'IsAny',
-        difficulty: 'hard',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsIsAny)) } },
-      },
-      greaterThan: {
-        id: 'greater-than',
-        name: 'GreaterThan',
-        difficulty: 'extreme',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsGreaterThan)) } },
-      },
-      transpose: {
-        id: 'transpose',
-        name: 'Transpose',
-        difficulty: 'extreme',
-        variants: { overview: { component: createProblemOverview(createTsCode(tsTranspose)) } },
-      },
-    },
-  },
-  typescriptProblems: {
-    title: 'Typescript Problems',
-    items: {} as Record<string, TProblem>,
-  },
 } as const
 
 // Helper to find a component by selection id (format: "problemId:variant")
@@ -1134,7 +627,6 @@ export default function App() {
     return {
       javascriptProblems: true,
       components: true,
-      typescript: true,
     }
   }
 
@@ -1166,7 +658,7 @@ export default function App() {
       <div className={css.container}>
         <div className={css.sidebar}>
           {Object.entries(SECTIONS).map(([sectionKey, section]) => {
-            const showSeparator = sectionKey === 'components' || sectionKey === 'typescript'
+            const showSeparator = sectionKey === 'components'
 
             return (
               <div key={sectionKey}>

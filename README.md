@@ -114,66 +114,65 @@ either in React or Vanilla TS, but this repo contains both solutions for referen
 
 Low-level DOM manipulation tasks and vanilla JavaScript implementations of common UI patterns.
 
-| #   | Problem         | Difficulty | Concepts                                                | Links                                            |
-| --- | --------------- | ---------- | ------------------------------------------------------- | ------------------------------------------------ |
-| 1   | **Detect Type** | 🟢 Easy    | `typeof`, `instanceof`, `Object.prototype.toString`     | [Solution](./src/problems/vanila/01-detect-type) |
-| 2   | **Debounce**    | 🟢 Easy    | Closures, `setTimeout`, Higher-order Functions          | [Solution](./src/problems/vanila/02-debounce)    |
-| 3   | **Throttle**    | 🟢 Easy    | Closures, Time-based Logic, Rate Limiting               | [Solution](./src/problems/vanila/03-throttle)    |
-| 4   | **ES5 Extends** | 🟡 Medium  | Prototypal Inheritance, `prototype` chain, `call/apply` | [Solution](./src/problems/vanila/04-es5-extends) |
-| 5   | **Deep Equals** | 🟡 Medium  | Recursion, Type Checking, Object Traversal              | [Solution](./src/problems/vanila/05-deep-equals) |
-| 6   | **Deep Clone**  | 🟡 Medium  | Recursion, Circular References, `WeakMap`               | [Solution](./src/problems/vanila/06-deep-clone)  |
-| 7   | **Stringify**   | 🟡 Medium  | Recursion, JSON Spec, Edge Cases                        | [Solution](./src/problems/vanila/07-stringify)   |
-| 8   | **Promise**     | 🔴 Hard    | Asynchrony, Microtasks, State Machine                   | [Solution](./src/problems/vanila/08-promise)     |
-| 9   | **Tree Select** | 🔴 Hard    | DOM Traversal, Event Bubbling / Delegation              | [Solution](./src/problems/vanila/09-tree-select) |
+| #   | Problem         | Difficulty | Concepts                                                | Links                                     |
+| --- | --------------- | ---------- | ------------------------------------------------------- | ----------------------------------------- |
+| 1   | **Detect Type** | 🟢 Easy    | `typeof`, `instanceof`, `Object.prototype.toString`     | [Solution](./src/problems/01-detect-type) |
+| 2   | **Debounce**    | 🟢 Easy    | Closures, `setTimeout`, Higher-order Functions          | [Solution](./src/problems/02-debounce)    |
+| 3   | **Throttle**    | 🟢 Easy    | Closures, Time-based Logic, Rate Limiting               | [Solution](./src/problems/05-throttle)    |
+| 4   | **ES5 Extends** | 🟡 Medium  | Prototypal Inheritance, `prototype` chain, `call/apply` | [Solution](./src/problems/06-es5-extends) |
+| 5   | **Deep Equals** | 🟡 Medium  | Recursion, Type Checking, Object Traversal              | [Solution](./src/problems/09-deep-equals) |
+| 6   | **Deep Clone**  | 🟡 Medium  | Recursion, Circular References, `WeakMap`               | [Solution](./src/problems/10-deep-clone)  |
+| 7   | **Stringify**   | 🟡 Medium  | Recursion, JSON Spec, Edge Cases                        | [Solution](./src/problems/13-stringify)   |
+| 8   | **Promise**     | 🔴 Hard    | Asynchrony, Microtasks, State Machine                   | [Solution](./src/problems/14-promise)     |
+| 9   | **Tree Select** | 🔴 Hard    | DOM Traversal, Event Bubbling / Delegation              | [Solution](./src/problems/17-tree-select) |
 
-### 2. React Components
+### 2. UI Components
 
-Reusable UI components and widgets implemented in React.
+Reusable UI components and widgets implemented in both React and Vanilla TypeScript.
 
-| #    | Component                | Difficulty | Concepts                                        | Links                                                                 |
-| ---- | ------------------------ | ---------- | ----------------------------------------------- | --------------------------------------------------------------------- |
-| 1    | **Accordion**            | 🟢 Easy    | State Management, Compound Components           | [Solution](./src/problems/components/01-accordion)                    |
-| 2    | **Star Rating**          | 🟢 Easy    | State, Hover Effects, Array Rendering           | [Solution](./src/problems/components/02-star-rating)                  |
-| 3    | **Tabs**                 | 🟢 Easy    | State, Composition, Accessibility               | [Solution](./src/problems/components/03-tabs)                         |
-| 4    | **Tooltip**              | 🟢 Easy    | Portals, Refs, Coordinate Math                  | [Solution](./src/problems/components/04-tooltip)                      |
-| 5    | **Dialog**               | 🟢 Easy    | HTMLDialogElement, Ref, Portals                 | [Solution](<./src/problems/components/05-dialog(todo)>)               |
-| 6    | **Table**                | 🟡 Medium  | Array Manipulation, Sorting/Filtering           | [Solution](./src/problems/components/06-table)                        |
-| 7    | **Reddit Thread**        | 🟡 Medium  | Recursion, Data Normalization                   | [Solution](./src/problems/components/07-reddit-thread)                |
-| 8    | **Gallery**              | 🟡 Medium  | Image Loading, Modal/Overlay                    | [Solution](./src/problems/components/08-gallery)                      |
-| 9    | **Nested Checkboxes**    | 🔴 Hard    | Recursion, Tree Data, Derived State             | [Solution](./src/problems/components/09-nested-checkboxes)            |
-| 10   | **Toast**                | 🔴 Hard    | React Context, Timers, Portals                  | [Solution](./src/problems/components/10-toast)                        |
-| 11   | **Calculator**           | 🔴 Hard    | String Parsing, State Machine                   | [Solution](./src/problems/components/11-calculator)                   |
-| 12   | **Square Game**          | 🔴 Hard    | Grid Rendering, Game State                      | [Solution](./src/problems/components/12-square-game)                  |
-| 13   | **Typeahead**            | 🔴 Hard    | Debouncing, Async Data, Keyboard Nav            | [Solution](./src/problems/components/13-typeahead)                    |
-| 14   | **Heatmap**              | 🔴 Hard    | Color Scales, Grid Layout, Tooltips             | [Solution](./src/problems/components/14-heatmap)                      |
-| 15   | **Progress Bar**         | 🔴 Hard    | CSS Transitions, Props Control                  | [Solution](./src/problems/components/15-progress-bar)                 |
-| 16   | **Upload Component**     | 🔴 Hard    | Drag & Drop API, File API                       | [Solution](./src/problems/components/16-upload-component)             |
-| 17   | **Portfolio Visualizer** | 🚀 Extreme | Data Visualization, Charts                      | [Solution](<./src/problems/components/17-portfolio-visualizer(todo)>) |
-| 18   | **Markdown Editor**      | 🚀 Extreme | Text Processing, Regex, Syntax Highlighting     | [Solution](./src/problems/components/18-markdown)                     |
-| 19   | **GPT Chat Interface**   | 🚀 Extreme | Streaming Responses, Auto-scroll                | [Solution](./src/problems/components/19-gpt-chat)                     |
-| 20   | **Infinite Canvas**      | 🚀 Extreme | Canvas API, 2D Transform Matrix, Virtualization | [Solution](./src/problems/components/20-infinite-canvas)              |
-| 19.1 | **GS: Basic**            | 🟡 Medium  | Map, Setup, Getters                             | [Solution](./src/problems/components/19.1-google-sheet-basic)         |
-| 19.2 | **GS: Compile**          | 🟡 Medium  | Tokenizer, RPN, AST Compile                     | [Solution](./src/problems/components/19.2-google-sheet-compile)       |
-| 19.3 | **GS: Topo Sort**        | 🔴 Hard    | Topological Sort, Cycle Detection               | [Solution](./src/problems/components/19.3-google-sheet-topo)          |
-| 19.4 | **GS: Eval**             | 🔴 Hard    | RPN Evaluation, basic formula                   | [Solution](./src/problems/components/19.4-google-sheet-eval)          |
-| 19.5 | **GS: Recompute**        | 🚀 Extreme | Graph Dependency, Full Engine                   | [Solution](./src/problems/components/19.5-google-sheet-recompute)     |
-| 19.6 | **GS: UX**               | 🚀 Extreme | Virtual Grid, Cell Editing, Formatting          | [Solution](./src/problems/components/19.6-google-sheet-ux)            |
+| #   | Component                        | Difficulty | Concepts                                    | Links                                                    |
+| --- | -------------------------------- | ---------- | ------------------------------------------- | -------------------------------------------------------- |
+| 1   | **Accordion**                    | 🟢 Easy    | State Management, Compound Components       | [Solution](./src/problems/21-accordion)                  |
+| 2   | **Star Rating**                  | 🟢 Easy    | State, Hover Effects, Array Rendering       | [Solution](./src/problems/22-star-rating)                |
+| 3   | **Tabs**                         | 🟢 Easy    | State, Composition, Accessibility           | [Solution](./src/problems/25-tabs)                       |
+| 4   | **Dialog**                       | 🟢 Easy    | HTMLDialogElement, Ref, Portals             | [Solution](./src/problems/26-dialog)                     |
+| 5   | **Tooltip**                      | 🟢 Easy    | Portals, Refs, Coordinate Math              | [Solution](./src/problems/29-tooltip)                    |
+| 6   | **Table**                        | 🟡 Medium  | Array Manipulation, Sorting/Filtering       | [Solution](./src/problems/30-table)                      |
+| 7   | **Reddit Thread**                | 🟡 Medium  | Recursion, Data Normalization               | [Solution](./src/problems/33-reddit-thread)              |
+| 8   | **Gallery**                      | 🟡 Medium  | Image Loading, Modal/Overlay                | [Solution](./src/problems/34-gallery)                    |
+| 9   | **Nested Checkboxes**            | 🔴 Hard    | Recursion, Tree Data, Derived State         | [Solution](./src/problems/37-nested-checkboxes)          |
+| 10  | **Toast**                        | 🔴 Hard    | React Context, Timers, Portals              | [Solution](./src/problems/38-toast)                      |
+| 11  | **Calculator**                   | 🔴 Hard    | String Parsing, State Machine               | [Solution](./src/problems/41-calculator)                 |
+| 12  | **Square Game**                  | 🔴 Hard    | Grid Rendering, Game State                  | [Solution](./src/problems/42-square-game)                |
+| 13  | **Typeahead**                    | 🔴 Hard    | Debouncing, Async Data, Keyboard Nav        | [Solution](./src/problems/45-typeahead)                  |
+| 14  | **Progress Bar**                 | 🔴 Hard    | CSS Transitions, Props Control              | [Solution](./src/problems/46-progress-bar)               |
+| 15  | **File Upload Hook**             | 🔴 Hard    | XMLHttpRequest, Progress Tracking           | [Solution](./src/problems/49-use-file-upload)            |
+| 16  | **Upload Component**             | 🔴 Hard    | Drag & Drop API, File API                   | [Solution](./src/problems/50-upload-component)           |
+| 17  | **Portfolio Visualizer (UX)**    | 🚀 Extreme | Data Visualization, Event Delegation        | [Solution](./src/problems/53-portfolio-visualizer-ux)    |
+| 18  | **Portfolio Visualizer (Logic)** | 🚀 Extreme | Tree Flattening, State Management           | [Solution](./src/problems/54-portfolio-visualizer-logic) |
+| 19  | **Markdown Editor**              | 🚀 Extreme | Text Processing, Regex, Syntax Highlighting | [Solution](./src/problems/55-markdown)                   |
+| 20  | **GPT Chat Interface**           | 🚀 Extreme | Streaming Responses, Auto-scroll            | [Solution](./src/problems/56-gpt-chat)                   |
+| 21  | **GS: Basic**                    | 🟡 Medium  | Map, Setup, Getters                         | [Solution](./src/problems/57-google-sheet-basic)         |
+| 22  | **GS: Compile**                  | 🟡 Medium  | Tokenizer, RPN, AST Compile                 | [Solution](./src/problems/58-google-sheet-compile)       |
+| 23  | **GS: Topo Sort**                | 🔴 Hard    | Topological Sort, Cycle Detection           | [Solution](./src/problems/59-google-sheet-topo)          |
+| 24  | **GS: Eval**                     | 🔴 Hard    | RPN Evaluation, basic formula               | [Solution](./src/problems/60-google-sheet-eval)          |
+| 25  | **GS: Recompute**                | 🚀 Extreme | Graph Dependency, Full Engine               | [Solution](./src/problems/61-google-sheet-recompute)     |
+| 26  | **GS: UX**                       | 🚀 Extreme | Virtual Grid, Cell Editing, Formatting      | [Solution](./src/problems/62-google-sheet-ux)            |
 
 ### 3. TypeScript Challenges
 
-A comprehensive collection of 9 levels of TypeScript type challenges.
+TypeScript type challenges are **interleaved throughout the course** alongside the JavaScript and Component problems. After every 2 core problems, you'll find 2 TypeScript type challenges to practice type-level programming. Look for folders with the `-challenge-` suffix in `src/problems/` (e.g., `03-tuple-length-challenge-1`).
 
-| Level | Topic                         | Key Concepts                               | Link                                                                           |
-| ----- | ----------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------ |
-| 1     | **Basics**                    | `keyof`, `typeof`, Indexed Access          | [Start Level](./src/problems/typescript/01-basics/index.md)                    |
-| 2     | **Mapped Types**              | Mapping, Modifiers `+`/`-`, Remapping `as` | [Start Level](./src/problems/typescript/02-mapped-types/index.md)              |
-| 3     | **Conditional Types**         | `T extends U ? X : Y`, Distributivity      | [Start Level](./src/problems/typescript/03-conditional-types/index.md)         |
-| 4     | **Infer**                     | `infer` keyword, Pattern Matching          | [Start Level](./src/problems/typescript/04-infer/index.md)                     |
-| 5     | **Template Literals**         | String manipulation, Intrinsic types       | [Start Level](./src/problems/typescript/05-template-literals/index.md)         |
-| 6     | **Recursive Types**           | Recursion, Accumulators, Depth limits      | [Start Level](./src/problems/typescript/06-recursive-types/index.md)           |
-| 7     | **Distributive Conditionals** | Union distribution, Naked generics         | [Start Level](./src/problems/typescript/07-distributive-conditionals/index.md) |
-| 8     | **Advanced Patterns**         | Filtering, OmitByValue, Sub-array chunks   | [Start Level](./src/problems/typescript/08-advanced-patterns/index.md)         |
-| 9     | **Expert Techniques**         | Contravariance, `any` hacks, Matrix types  | [Start Level](./src/problems/typescript/09-expert-techniques/index.md)         |
+The challenges cover topics including: Basics, Mapped Types, Conditional Types, Infer, Template Literals, Recursive Types, Distributive Conditionals, Advanced Patterns, and Expert Techniques.
+
+---
+
+## 🙏 Credits
+
+Some problems in this course are inspired by or adapted from the following open-source resources:
+
+- **[BFE.dev](https://bfe.dev/)** — A platform for frontend interview preparation with a great collection of JavaScript and UI coding challenges.
+- **[type-challenges](https://github.com/type-challenges/type-challenges)** — A collection of TypeScript type challenges by Anthony Fu. Our TypeScript challenges are based on problems from this repository.
 
 ---
 

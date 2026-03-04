@@ -4,7 +4,7 @@
     "paths": {
       "@course/styles": ["src/utilities/styles.module.css"],
       "@course/cx": ["src/utilities/utility.ts"],
-      "@course/types": ["src/problems/typescript/types.ts"]
+      "@course/types": ["src/utilities/types.ts"]
     },
     "target": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -28,5 +28,5 @@
     "noUncheckedSideEffectImports": true
   },
   "include": ["src"],
-  "exclude": ["src/problems/typescript"]
+  "exclude": []
 }
