@@ -16,7 +16,7 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-type Length<T extends readonly any[]> = T['length'];
+type Length = {};
 
 /* _____________ Test Cases _____________ */
 

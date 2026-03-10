@@ -2,20 +2,9 @@
 
 export const myExtends = (SuperType: Function, SubType: Function) => {
   // Step 1: Create a new constructor function MyType(this, ...args)
-  function ExtendedType(...args: any[]) {
-    const target = Object.create(SubType.prototype)
-    SuperType.apply(target, args);
-    SubType.apply(target, args);
-    return target;
-  }
   // Step 2: Set up prototype chain
-  Object.setPrototypeOf(SubType.prototype, SuperType.prototype);
-
   // Step 3: Set up static/constructor inheritance
-  Object.setPrototypeOf(ExtendedType, SuperType)
-
   // Step 4: Return MyType
-  return ExtendedType;
 }
 
 // --- Examples ---

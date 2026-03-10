@@ -15,7 +15,7 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-// Your implementation here
+type MyAwaited<T> = {};
 
 /* _____________ Test Cases _____________ */
 

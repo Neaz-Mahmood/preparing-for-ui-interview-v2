@@ -31,8 +31,20 @@ export const GalleryVanillaExample = () => {
   return <div ref={rootRef}></div>
 }
 export const GalleryStudentExample = () => {
-  return <GalleryStudent />
+  return <GalleryStudent images={IMAGES} />
 }
 export const GalleryStudentVanillaExample = () => {
-  return <div>Student Vanilla: TODO implement wrapper</div>
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!rootRef.current) return
+    const gallery = new GalleryVanilaStudent({
+      root: rootRef.current,
+      images: IMAGES,
+    })
+    gallery.render()
+    return () => gallery.destroy()
+  }, [])
+
+  return <div ref={rootRef}></div>
 }

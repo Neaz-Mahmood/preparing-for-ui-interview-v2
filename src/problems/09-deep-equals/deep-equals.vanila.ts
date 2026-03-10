@@ -3,35 +3,7 @@
 import { detectType } from '@course/utils'
 
 export function deepEquals(a: any, b: any, cache = new Map()): boolean {
-  if(a === b || cache.has(a) && cache.get(a) === b) {
-    return true;
-  }
-  const [typeA, typeB] = [detectType(a), detectType(b)];
 
-  if(typeA !== typeB) {
-    return false;
-  }
-
-  if(typeof a !== 'object') {
-    return a === b;
-  }
-
-  const [keysA, keysB] = [a, b]
-                          .map(Object.keys)
-                          .map((v) => new Set(v));
-
-  if(keysA.symmetricDifference(keysB).size > 0) {
-    return false;
-  }
-
-  cache.set(a, b);
-  for(const key of keysA) {
-    if(!deepEquals(a[key], b[key], cache)) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 // --- Examples ---

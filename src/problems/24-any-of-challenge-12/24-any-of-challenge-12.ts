@@ -13,14 +13,9 @@ import type { Equal, Expect } from '@course/types'
 
 type Falsy = '' | 0 | false | undefined | null | []
 
-type IsTruthy<T> = T extends Falsy ? false : keyof T extends never ? false : true
 /* _____________ Your Code Here _____________ */
 
-type AnyOf<T extends readonly any[]> = T extends [infer Head, ...infer Tail]
-     ? IsTruthy<Head> extends true
-       ? true
-       : AnyOf<Tail>
-     : false
+type AnyOf = {}
 
 /* _____________ Test Cases _____________ */
 

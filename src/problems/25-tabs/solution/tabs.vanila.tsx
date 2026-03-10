@@ -30,7 +30,9 @@ export class Tabs extends AbstractComponent<TTabsProps> {
   toHTML(): string {
     const { className, target } = this.config
     const classes = cx(...(className ?? []))
-    const contentHtml = target ? '' : `<section role="tabpanel" id="tab-panel" aria-labelledby="tab-${this.#defaultTab}" class="${css.container}"></section>`
+    const contentHtml = target
+      ? ''
+      : `<section role="tabpanel" id="tab-panel" aria-labelledby="tab-${this.#defaultTab}" class="${css.container}"></section>`
 
     return `
             <nav class="${classes}">
@@ -86,7 +88,10 @@ export class Tabs extends AbstractComponent<TTabsProps> {
   #getTabs(): string {
     const { tabs } = this.config
     return tabs
-      .map((tab) => `<li role="presentation"><button role="tab" id="tab-${tab.name}" data-tab-name="${tab.name}" aria-controls="tab-panel" aria-selected="false">${tab.name}</button></li>`)
+      .map(
+        (tab) =>
+          `<li role="presentation"><button role="tab" id="tab-${tab.name}" data-tab-name="${tab.name}" aria-controls="tab-panel" aria-selected="false">${tab.name}</button></li>`,
+      )
       .join('')
   }
 }

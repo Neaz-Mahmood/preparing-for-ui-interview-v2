@@ -1,8 +1,7 @@
-import {AbstractComponent, type TComponentConfig} from '@course/utils'
+import { AbstractComponent, type TComponentConfig } from '@course/utils'
 import css from './star-rating.module.css'
 import flex from '@course/styles'
-import cx from "@course/cx";
-
+import cx from '@course/cx'
 
 /**
  * Expected input:
@@ -34,13 +33,12 @@ const STAR = '⭐️'
 const STARS_COUNT = 5
 
 type TStarRatingProps = {
-  value: number,
-  onValueChange?: (value: number) => void,
+  value: number
+  onValueChange?: (value: number) => void
   readOnly?: boolean
 }
 export class StarRating extends AbstractComponent<TStarRatingProps> {
-
-  value: number = 0;
+  value: number = 0
 
   constructor(props: TComponentConfig<TStarRatingProps>) {
     super(props)
@@ -48,7 +46,7 @@ export class StarRating extends AbstractComponent<TStarRatingProps> {
     // TODO: init value from props
   }
 
-  onClick({target}: Event) {
+  onClick({ target }: Event) {
     // TODO: handle click event
     // - check if readOnly, return early if so
     // - check if target has data-rating attribute

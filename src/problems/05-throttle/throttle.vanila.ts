@@ -1,17 +1,8 @@
 // bun test src/problems/05-throttle/test/throttle.test.ts
 
-export const throttle =
-    <F extends (...args:[]) => void>(fn: F, delay: number): (...args: Parameters<F>) => void => {
-  let lastCall = 0;
-  return function throttled(this: unknown, ...args: Parameters<F>): void {
-    const now = Date.now();
-    if(now - lastCall >= delay) {
-      fn.apply(this, args);
-      lastCall = now;
-    }
-  }
-}
+export function throttle() {
 
+}
 // --- Examples ---
 // Uncomment to test your implementation:
 

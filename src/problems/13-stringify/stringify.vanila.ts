@@ -1,6 +1,6 @@
 // bun test src/problems/13-stringify/test/stringify.test.ts
 
-import {detectType} from '@course/utils'
+import { detectType } from '@course/utils'
 
 /**
  * Converts a value to its string representation.
@@ -23,44 +23,24 @@ import {detectType} from '@course/utils'
  * - other:     unknown type     → '"Unsupported Type"'
  */
 export const stringify = (a: any, cache = new Set()) => {
-    const type = detectType(a);
-    if(cache.has(a)) {
-        return '[Circular]';
-    }
-    switch (type) {
-        case 'null':
-        case 'number':
-        case 'bigint':
-        case 'boolean':
-            return `${a}`;
-        case 'symbol':
-            return `${String(a)}`
-        case 'undefined':
-        case 'string':
-            return `"${a}"`
-        case 'object':
-        case 'map': {
-            cache.add(a);
-            const entries = (a instanceof Map ? a.entries() : Object.entries(a));
-            const content = Array.from(entries).map(([k, v]): string => {
-                return `${k}: ${stringify(v, cache)}`;
-            }).join(', ');
-            return `{ ${content} }`
-        }
-        case 'array':
-        case 'set':
-            cache.add(a);
-            const content = Array.from(a)
-                .map((v): string => stringify(v, cache))
-                .join(',');
-            return `[${content}]`
-        case 'date':
-            return `${(a as Date).toLocaleString()}`
-        case 'regexp':
-            return (a as RegExp).toString()
-        default:
-            return '"Unsupported Type"'
-    }
+  const type = detectType(a)
+  switch (type) {
+    case 'null':
+    case 'number':
+    case 'bigint':
+    case 'boolean':
+    case 'symbol':
+    case 'undefined':
+    case 'string':
+    case 'object':
+    case 'map':
+    case 'array':
+    case 'set':
+    case 'date':
+    case 'regexp':
+    default:
+      return '"Unsupported Type"'
+  }
 }
 
 // --- Examples ---

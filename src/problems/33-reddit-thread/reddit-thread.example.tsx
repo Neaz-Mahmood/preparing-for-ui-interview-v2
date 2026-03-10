@@ -87,8 +87,20 @@ export function RedditThreadVanillaExample() {
   return <div ref={rootRef}></div>
 }
 export const RedditThreadStudentExample = () => {
-  return <RedditThreadStudent />
+  return <RedditThreadStudent comments={MOCK_COMMENTS} />
 }
 export const RedditThreadStudentVanillaExample = () => {
-  return <div>Student Vanilla: TODO implement wrapper</div>
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!rootRef.current) return
+    const thread = new RedditThreadVanilaStudent({
+      root: rootRef.current,
+      comments: MOCK_COMMENTS,
+    })
+    thread.render()
+    return () => thread.destroy()
+  }, [])
+
+  return <div ref={rootRef}></div>
 }

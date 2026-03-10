@@ -204,14 +204,22 @@ export function TooltipStudentExample() {
         }}
       >
         <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)' }}>
-          <TooltipStudent position="auto" boundary={autoBoundaryRef} content="No room above → goes bottom">
+          <TooltipStudent
+            position="auto"
+            boundary={autoBoundaryRef}
+            content="No room above → goes bottom"
+          >
             <button>Top Edge</button>
           </TooltipStudent>
         </div>
         <div
           style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }}
         >
-          <TooltipStudent position="auto" boundary={autoBoundaryRef} content="No room below → goes top">
+          <TooltipStudent
+            position="auto"
+            boundary={autoBoundaryRef}
+            content="No room below → goes top"
+          >
             <button>Bottom Edge</button>
           </TooltipStudent>
         </div>
@@ -286,7 +294,13 @@ export function TooltipStudentVanillaExample() {
     ) => {
       const btn = document.createElement('button')
       btn.textContent = btnText
-      const tooltip = new VanillaTooltipStudent({ root, children: btn, content: text, position, boundary })
+      const tooltip = new VanillaTooltipStudent({
+        root,
+        children: btn,
+        content: text,
+        position,
+        boundary,
+      })
       tooltip.render()
       return tooltip
     }

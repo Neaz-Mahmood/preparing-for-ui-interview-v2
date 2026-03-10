@@ -45,19 +45,32 @@ export function Tabs({ defaultTab, children, target }: TTabsProps) {
   return (
     <div>
       <nav>
-        <ul role="tablist" onClickCapture={handleTabClick} className={cx(flex.flexRowStart, flex.flexGap16)}>
+        <ul
+          role="tablist"
+          onClickCapture={handleTabClick}
+          className={cx(flex.flexRowStart, flex.flexGap16)}
+        >
           {children.map((child) =>
-            React.cloneElement(child, { isActive: child.props.name === activeTab })
+            React.cloneElement(child, { isActive: child.props.name === activeTab }),
           )}
         </ul>
       </nav>
       {content && target?.current != null ? (
         createPortal(
-          <div role="tabpanel" id="tab-panel" aria-labelledby={`tab-${activeTab}`}>{content}</div>,
-          target.current
+          <div role="tabpanel" id="tab-panel" aria-labelledby={`tab-${activeTab}`}>
+            {content}
+          </div>,
+          target.current,
         )
       ) : (
-        <section role="tabpanel" id="tab-panel" aria-labelledby={`tab-${activeTab}`} className={tabs.container}>{content}</section>
+        <section
+          role="tabpanel"
+          id="tab-panel"
+          aria-labelledby={`tab-${activeTab}`}
+          className={tabs.container}
+        >
+          {content}
+        </section>
       )}
     </div>
   )

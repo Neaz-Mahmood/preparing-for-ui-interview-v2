@@ -21,9 +21,5 @@ import cx from '@course/cx'
 type TProps = {}
 
 export const Accordion = (props: TProps) => {
-  return (
-    <div>
-      {/* TODO: implement */}
-    </div>
-  )
+  return <div>{/* TODO: implement */}</div>
 }

@@ -23,10 +23,10 @@ export type TType =
   | string
 
 export const detectType = (value: any): TType => {
-  if(value == null) {
-    return `${value}`;
+  if (value == null) {
+    return `${value}`
   }
-  return (Object.getPrototypeOf(value)?.constructor?.name ?? 'object').toLowerCase();
+  return (Object.getPrototypeOf(value)?.constructor?.name ?? 'object').toLowerCase()
 }
 
 // --- Examples ---

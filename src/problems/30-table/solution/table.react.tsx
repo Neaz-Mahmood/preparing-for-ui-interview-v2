@@ -73,7 +73,9 @@ export function Table<T extends { id: string }>({
 
   const slice = useMemo(() => {
     const filtered = query
-      ? (search ? search(query, data) : data.filter((item) => item.id.includes(query)))
+      ? search
+        ? search(query, data)
+        : data.filter((item) => item.id.includes(query))
       : data
     const sorted =
       sort && comparator && sort.direction !== 'none'

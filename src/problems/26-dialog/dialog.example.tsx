@@ -7,8 +7,14 @@ import { Dialog as VanillaDialogStudent } from './dialog.vanila'
 export function DialogExample() {
   const [open, setOpen] = useState(false)
 
-  const handleConfirm = () => { alert('Confirmed'); setOpen(false) }
-  const handleCancel = () => { alert('Cancelled'); setOpen(false) }
+  const handleConfirm = () => {
+    alert('Confirmed')
+    setOpen(false)
+  }
+  const handleCancel = () => {
+    alert('Cancelled')
+    setOpen(false)
+  }
 
   return (
     <div>
@@ -60,7 +66,17 @@ export const DialogStudentExample = () => {
   return (
     <div>
       <button onClick={() => setOpen(true)}>Open Dialog</button>
-      <DialogStudent open={open} onConfirm={() => { alert('Confirmed'); setOpen(false) }} onCancel={() => { alert('Cancelled'); setOpen(false) }}>
+      <DialogStudent
+        open={open}
+        onConfirm={() => {
+          alert('Confirmed')
+          setOpen(false)
+        }}
+        onCancel={() => {
+          alert('Cancelled')
+          setOpen(false)
+        }}
+      >
         <h2>Confirm Action</h2>
         <p>Are you sure you want to proceed?</p>
       </DialogStudent>

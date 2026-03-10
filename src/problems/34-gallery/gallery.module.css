@@ -1,1 +1,15 @@
 /* Student solution styles */
+.button {
+  width: 100px;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  top: 0;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  z-index: 10;
+}
+.gallery {}
+.image img {}
+.image {}
+.image__list {}

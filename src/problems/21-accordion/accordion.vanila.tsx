@@ -1,4 +1,4 @@
-import {AbstractComponent, type TComponentConfig} from '@course/utils'
+import { AbstractComponent, type TComponentConfig } from '@course/utils'
 import styles from './accordion.module.css'
 import flex from '@course/styles'
 import cx from '@course/cx'
@@ -20,16 +20,16 @@ import cx from '@course/cx'
  * 4. Add CSS — use styles and cx() for className composition
  */
 type TAccordionItem = {
-    id: string,
-    title: string,
-    content: string
+  id: string
+  title: string
+  content: string
 }
 type TAccordionProps = {
-    items: TAccordionItem[]
+  items: TAccordionItem[]
 }
 
 export class Accordion extends AbstractComponent<TAccordionProps> {
-    toHTML(): string {
-        return ``
-    }
+  toHTML(): string {
+    return ``
+  }
 }

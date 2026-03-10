@@ -5,69 +5,25 @@ import { detectType } from '@course/utils'
 
 type TCollection = Map<any, any> | Set<any> | Record<any, any> | Array<any>
 
-
-function getTarget(type: string): TCollection {
-  switch(type) {
-    case 'array':
-      return [];
-    case 'object':
-      return {};
-    case 'map':
-      return new Map();
-    case 'set':
-      return new Set();
-    default:
-      throw 'Unsupported type "' + type + '"';
-  }
-}
-
+function getTarget(type: string): TCollection {}
 function entries(target: TCollection): Iterable<[key: any, value: any]> {
-  if(Array.isArray(target) || target instanceof Map || target instanceof Set) {
-    return Array.from(target.entries());
-  } else {
-    return Object.entries(target);
-  }
-}
-
-function set(target: TCollection, key: any, value: any) {
-  if(Array.isArray(target)) {
-    target[key] = value;
-  } else if(target instanceof Set) {
-    target.add(value)
-  } else if(target instanceof Map) {
-    target.set(key, value)
-  } else {
-    target[key] = value
-  }
-}
-
+function set(target: TCollection, key: any, value: any) {}
 
 export const deepClone = <T>(a: T, cache = new Map()): T => {
-  const type= detectType(a);
+  const type = detectType(a)
 
-  if(!a || typeof a !== 'object') {
-    return a;
+  if (!a || typeof a !== 'object') {
+    return a
   }
 
   switch (type) {
     case 'date':
-      return new Date(a as unknown as Date) as T;
     case 'object':
     case 'map':
     case 'set':
-    case 'array': {
-      if(cache.has(a)) {
-        return cache.get(a);
-      }
-      const target = getTarget(type);
-      cache.set(a, target);
-      for (const [key, value] of entries(a)) {
-        set(target, key, deepClone(value, cache));
-      }
-      return target as T;
-    }
+    case 'array':
     default:
-      throw 'Unsupported type ' + a;
+      throw 'Unsupported type ' + a
   }
 }
 
