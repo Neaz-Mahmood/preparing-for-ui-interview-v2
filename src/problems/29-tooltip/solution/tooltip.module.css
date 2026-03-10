@@ -22,24 +22,20 @@
 
 .top {
   top: 0;
-  left: 50%;
-  transform: translate(-50%, calc(-100% - 0.5rem));
+  transform: translateY(-100%);
 }
 
 .bottom {
   bottom: 0;
-  left: 50%;
-  transform: translate(-50%, calc(100% + 0.5rem));
+  transform: translateY(100%);
 }
 
 .left {
-  top: 50%;
   left: 0;
-  transform: translate(calc(-100% - 0.5rem), -50%);
+  transform: translateX(-100%);
 }
 
 .right {
-  top: 50%;
   left: 100%;
-  transform: translate(0.5rem, -50%);
+  transform: translateX(0);
 }

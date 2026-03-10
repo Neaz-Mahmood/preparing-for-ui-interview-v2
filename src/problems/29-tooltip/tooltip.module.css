@@ -1,30 +1,19 @@
 /* Container: relative positioning, inline-block */
 .container {
+    position: relative;
 }
 
 /* Tooltip: absolute positioned, styled box with opacity transition */
-.tooltip {
-}
-
-/* Position classes: set opacity to 1 when active */
-.top,
-.bottom,
-.left,
-.right {
-}
+.tooltip {}
 
 /* Top: above trigger, centered horizontally, offset by 0.5rem */
-.top {
-}
+.top {}
 
 /* Bottom: below trigger, centered horizontally, offset by 0.5rem */
-.bottom {
-}
+.bottom {}
 
 /* Left: to the left of trigger, centered vertically, offset by 0.5rem */
-.left {
-}
+.left {}
 
 /* Right: to the right of trigger, centered vertically, offset by 0.5rem */
-.right {
-}
+.right {}

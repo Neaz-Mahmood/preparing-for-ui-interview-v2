@@ -15,8 +15,6 @@ const positions = {
   right: css.right,
 } as const
 
-const OFFSET = 8 // 0.5rem
-
 let id = 0
 
 type TCandidate = { position: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number }
@@ -36,10 +34,10 @@ function getAutoPosition(
     Math.ceil(y + t.height) <= boundaryRect.bottom
 
   const candidates: TCandidate[] = [
-    { position: 'top', x: c.left + c.width / 2 - t.width / 2, y: c.top - t.height - OFFSET },
-    { position: 'right', x: c.right + OFFSET, y: c.top + c.height / 2 - t.height / 2 },
-    { position: 'bottom', x: c.left + c.width / 2 - t.width / 2, y: c.bottom + OFFSET },
-    { position: 'left', x: c.left - t.width - OFFSET, y: c.top + c.height / 2 - t.height / 2 },
+    { position: 'top', x: c.left, y: c.top - t.height },
+    { position: 'right', x: c.right, y: c.top },
+    { position: 'bottom', x: c.left, y: c.bottom },
+    { position: 'left', x: c.left - t.width, y: c.top },
   ]
 
   return candidates.find(({ x, y }) => fits(x, y))?.position ?? 'top'

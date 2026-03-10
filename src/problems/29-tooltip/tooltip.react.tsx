@@ -16,8 +16,6 @@ const positions = {
   right: css.right,
 } as const
 
-const OFFSET = 8 // 0.5rem
-
 type TCandidate = { position: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number }
 
 /**
