@@ -1,7 +1,11 @@
 // bun test src/problems/02-debounce/test/debounce.test.ts
 
-export function debounce() {
-
+export function debounce(func: Function, delay: number) {
+    let timeoutId: NodeJS.Timeout;
+    return function (...args: any[]) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
 }
 
 // --- Examples ---
