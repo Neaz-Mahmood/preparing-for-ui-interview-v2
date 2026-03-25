@@ -1,6 +1,16 @@
 // bun test src/problems/05-throttle/test/throttle.test.ts
+export function throttle<T extends (...args: any[]) => any>(func:T, delay: number): (...args: Parameters<T>) => void  {
+  let lastTime = 0;
 
-export function throttle() {
+  return function(this: any, ...args: any[]) {
+    const now = Date.now();
+
+    if(now - lastTime >= delay) {
+      func.apply(this, args)
+      lastTime = now;
+    }
+  }
+
 
 }
 // --- Examples ---

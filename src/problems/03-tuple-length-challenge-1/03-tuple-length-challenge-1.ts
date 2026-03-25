@@ -16,7 +16,8 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-type Length = {};
+type Length<T extends readonly unknown[]> = T['length']
+type First<T extends readonly unknown[]> = T[0]
 
 /* _____________ Test Cases _____________ */
 
