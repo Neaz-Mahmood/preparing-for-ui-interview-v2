@@ -3,7 +3,7 @@
 export const myExtends = (SuperType: Function, SubType: Function) => {
   // Step 1: Create a new constructor function MyType(this, ...args)
   // Step 2: Set up prototype chain
-  // Step 3: Set up static/constructor inheritance
+  // Step 3: Set up static/construcstor inheritance
   // Step 4: Return MyType
 }
 
